@@ -8,6 +8,7 @@
         <p class="sub">Sign in to continue your study plan</p>
 
         <form action="/login" method="post" id="loginForm">
+            <input type="hidden" name="tz_offset" id="tzOffset" value="0">
             <div class="form-group">
                 <label class="form-label" for="username">Username</label>
                 <input type="text" class="form-control" id="username" name="username"
@@ -33,6 +34,9 @@
 </div>
 
 <script>
+// Set timezone offset immediately on page load
+document.getElementById('tzOffset').value = new Date().getTimezoneOffset();
+
 function togglePw(inputId, btn) {
     const inp = document.getElementById(inputId);
     inp.type  = inp.type === 'password' ? 'text' : 'password';

@@ -166,7 +166,13 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        timezone_offset = session.get("timezone_offset", session.get("tz_offset_minutes"))
+        # Read timezone offset from the hidden form field first (most reliable),
+        # falling back to whatever was already in the session.
+        form_tz = request.form.get("tz_offset")
+        try:
+            timezone_offset = int(form_tz)
+        except (TypeError, ValueError):
+            timezone_offset = session.get("timezone_offset", session.get("tz_offset_minutes"))
         session.clear()
         if timezone_offset is not None:
             session["timezone_offset"] = timezone_offset
