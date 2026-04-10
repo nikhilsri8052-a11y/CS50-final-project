@@ -477,7 +477,7 @@ body::after {
 
 /* ─── Features ─── */
 #features { padding: 4rem 2rem; text-align: center; }
-#features h2 { font-size: 1.85rem; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.6rem; }
+#features h2 { font-size: 1.85rem; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.6rem; color: var(--blue-600); }
 #features .section-sub { color: var(--text-2); max-width: 420px; margin: 0 auto 3rem; font-size: 0.9rem; }
 .features-grid {
   max-width: 960px; margin: 0 auto 4rem;
@@ -490,7 +490,7 @@ body::after {
   border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
   font-size: 1.25rem; margin-bottom: 0.9rem; border: 1px solid var(--blue-100);
 }
-.feature-card h3 { font-size: 0.93rem; font-weight: 700; margin-bottom: 0.4rem; }
+.feature-card h3 { font-size: 0.93rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--blue-600); }
 .feature-card p  { font-size: 0.8rem; color: var(--text-2); line-height: 1.65; }
 
 .stats-card-intro {
@@ -503,6 +503,7 @@ body::after {
   font-size: 1.1rem;
   font-weight: 800;
   margin-bottom: 0.2rem;
+  color: var(--blue-600);
 }
 .stats-card-intro > p {
   color: var(--text-2);

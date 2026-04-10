@@ -42,7 +42,14 @@
         </div>
     </div>
 
-    <div class="stats-card-intro glass">
+    <div class="animation-stage glass">
+        <h3>How it works</h3>
+        <p>A completely automated workflow for academic success.</p>
+        <canvas id="demoCanvas" width="640" height="340"></canvas>
+        <div class="animation-caption" id="animCap">The student types subjects and topics...</div>
+    </div>
+
+    <div id="stats" class="stats-card-intro glass">
         <h3>Website Stats</h3>
         <p>Latest active learners and their current login streaks.</p>
         {% if recent_logins %}
@@ -58,13 +65,6 @@
         {% else %}
             <p class="stats-empty">No login activity yet. Be the first to start a streak!</p>
         {% endif %}
-    </div>
-
-    <div class="animation-stage glass">
-        <h3>How it works</h3>
-        <p>A completely automated workflow for academic success.</p>
-        <canvas id="demoCanvas" width="640" height="340"></canvas>
-        <div class="animation-caption" id="animCap">The student types subjects and topics...</div>
     </div>
 </section>
 
