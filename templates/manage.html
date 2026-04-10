@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+{% block title %}Manage Plan{% endblock %}
+{% block content %}
+
+<div class="page page-md">
+    <div class="page-header">
+        <h2>Manage your plan</h2>
+        <p>Add more subjects and topics to your existing study plan without losing progress.</p>
+    </div>
+
+    <!-- Existing subjects overview -->
+    {% if subjects %}
+    <div class="glass" style="padding:1.5rem;margin-bottom:1.5rem;">
+        <div class="section-label" style="margin-bottom:1rem;">Current plan overview</div>
+        {% for subj in subjects %}
+        <div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid rgba(145,201,241,0.2);">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;flex-wrap:wrap;">
+                <span style="font-weight:700;font-size:.92rem;">{{ subj.sname }}</span>
+                <span class="badge-pill badge-blue">Difficulty {{ subj.difficulty }}/10</span>
+                <span class="badge-pill badge-blue">{{ subj.done }}/{{ subj.total }} topics done</span>
+            </div>
+            {% if subj.topics %}
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                {% for t in subj.topics %}
+                <span style="display:inline-flex;align-items:center;gap:5px;background:{% if t.completed %}var(--green-bg){% else %}var(--blue-50){% endif %};color:{% if t.completed %}#1a5c38{% else %}var(--blue-700){% endif %};border:1px solid {% if t.completed %}#b7dfc6{% else %}var(--blue-100){% endif %};padding:3px 10px;border-radius:99px;font-size:.73rem;font-weight:600;">
+                    {% if t.completed %}✓{% endif %} {{ t.tname }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Add more subjects/topics form -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem;flex-wrap:wrap;gap:.5rem;">
+        <div class="section-label" style="margin-bottom:0;">Add more subjects &amp; topics</div>
+        <a href="/start_fresh" class="btn btn-danger btn-sm" onclick="return confirm('This will DELETE your current plan and start fresh. Are you sure?')">
+            🗑 Start fresh
+        </a>
+    </div>
+
+    <form action="/add_subjects" method="post" id="addForm">
+        <div id="addContainer"></div>
+        <button type="button" class="add-subject-btn" onclick="addSubject()">＋ Add subject</button>
+
+        <div id="submitWrap" style="display:none;">
+            <button type="submit" class="btn btn-primary btn-block" style="padding:13px;" onclick="this.textContent='Saving...';this.disabled=true;">
+                Save to plan →
+            </button>
+        </div>
+    </form>
+
+    <p class="text-muted text-center mt-2" style="font-size:.8rem;">
+        New topics will be added to your schedule starting from tomorrow.
+    </p>
+</div>
+
+<script>
+let sc = 0;
+
+function addSubject() {
+    const id = sc++;
+    const el = document.createElement('div');
+    el.className = 'glass subject-card';
+    el.id = 'sub-' + id;
+    el.style.animation = 'fadeUp 0.3s ease both';
+    el.innerHTML = `
+        <button type="button" class="subject-remove" onclick="removeSubject(this)" title="Remove">✕</button>
+        <div class="subject-header">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Subject name</label>
+                <input type="text" name="subjects[${id}][name]" class="form-control" placeholder="e.g. Physics" required>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Difficulty (1–10)</label>
+                <input type="number" name="subjects[${id}][difficulty]" min="1" max="10" class="form-control" placeholder="e.g. 8" required>
+            </div>
+        </div>
+        <div class="section-label" style="font-size:.68rem;margin-bottom:.5rem;">Topics</div>
+        <div id="topics-${id}">
+            <div class="input-group">
+                <input type="text" name="subjects[${id}][topics][]" class="form-control" placeholder="Topic name" required>
+                <button type="button" class="btn-remove" onclick="removeTopic(this)">×</button>
+            </div>
+        </div>
+        <button type="button" class="add-btn" onclick="addTopic(${id})">＋ Add topic</button>
+    `;
+    document.getElementById('addContainer').appendChild(el);
+    el.querySelector('input[type=text]').focus();
+    document.getElementById('submitWrap').style.display = 'block';
+}
+
+function removeSubject(btn) {
+    btn.closest('.subject-card').remove();
+    if (!document.querySelector('#addContainer .subject-card')) {
+        document.getElementById('submitWrap').style.display = 'none';
+    }
+}
+
+function addTopic(sid) {
+    const container = document.getElementById('topics-' + sid);
+    const subEl     = document.getElementById('sub-' + sid);
+    const name      = subEl.querySelector('input[name$="[name]"]').name.match(/\[(\d+)\]/)[1];
+    const div       = document.createElement('div');
+    div.className   = 'input-group';
+    div.innerHTML = `
+        <input type="text" name="subjects[${name}][topics][]" class="form-control" placeholder="Topic name" required>
+        <button type="button" class="btn-remove" onclick="removeTopic(this)">×</button>
+    `;
+    container.appendChild(div);
+    div.querySelector('input').focus();
+}
+
+function removeTopic(btn) {
+    const group     = btn.closest('.input-group');
+    const container = group.parentElement;
+    if (container.querySelectorAll('.input-group').length > 1) group.remove();
+}
+</script>
+
+{% endblock %}

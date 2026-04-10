@@ -1,23 +1,51 @@
 {% extends "layout.html" %}
-
-{% block topic %}
-    Login
-{% endblock %}
+{% block title %}Sign in{% endblock %}
 {% block content %}
-<div class="topic">
-    <form action="/login" method="post">
-        <h1>
-            Login
-        </h1>
-    <div class="mb-3">
-        <label for="username" class="form-label">Username</label>
-        <input type="username" class="form-control" id="username" name="username" placeholder="Username">
+
+<div class="auth-wrap">
+    <div class="auth-card glass">
+        <h1>Welcome back</h1>
+        <p class="sub">Sign in to continue your study plan</p>
+
+        <form action="/login" method="post" id="loginForm">
+            <div class="form-group">
+                <label class="form-label" for="username">Username</label>
+                <input type="text" class="form-control" id="username" name="username"
+                       placeholder="Your username" autocomplete="username" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <div class="pw-wrap">
+                    <input type="password" class="form-control" id="password" name="password"
+                           placeholder="Your password" autocomplete="current-password" required>
+                    <button type="button" class="pw-toggle" onclick="togglePw('password', this)">Show</button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block mt-2">
+                Sign in →
+            </button>
+        </form>
+
+        <div class="auth-link">
+            Don't have an account? <a href="/register">Create one free</a>
+        </div>
     </div>
-    <div class="mb-3">
-        <label for="exampleInputPassword1" class="form-label">Password</label>
-        <input type="password" class="form-control" id="exampleInputPassword1" name="password" placeholder="Password">
-    </div>
-    <button type="submit" class="btn btn-primary w-100">Submit</button>
-    </form>
 </div>
+
+<script>
+function togglePw(inputId, btn) {
+    const inp = document.getElementById(inputId);
+    inp.type  = inp.type === 'password' ? 'text' : 'password';
+    btn.textContent = inp.type === 'password' ? 'Show' : 'Hide';
+}
+
+document.getElementById('loginForm').addEventListener('submit', function () {
+    const submit = this.querySelector('[type="submit"]');
+    if (submit) {
+        submit.textContent = 'Signing in...';
+        submit.disabled = true;
+    }
+});
+</script>
+
 {% endblock %}

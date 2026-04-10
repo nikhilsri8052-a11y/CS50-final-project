@@ -1,36 +1,304 @@
 {% extends "layout.html" %}
-
-{% block title %}
-    Intro
-{% endblock %}
-
+{% block title %}Welcome{% endblock %}
 {% block content %}
-    <div class="topic">
-        <div>
-            <h1>AI Study Planner</h1>
-            <div>
-                <a href="/login">
-                    <button type="button" class="btn btn-primary btn-lg">Log In</button>
-                </a>
-                <a href="/register">
-                    <button type="button" class="btn btn-secondary btn-lg">Register</button>
-                </a>
-            </div>
-            <h4>
-                Name: Nikhil Srivastava
-            </h4>
-            <h4>
-                edx user name: nikhilsri8052
-            </h4>
-            <h4>
-                github user name:nikhilsri8052-a11y
-            </h4>
-            <h4>
-                city and country:Prayagraj And India
-            </h4>
-            <h4>
-                date:30-03-2026
-            </h4>
+
+<section class="hero">
+    <span class="hero-badge">✦ Smart Learning Engine</span>
+    <h1>Study smarter,<br><span>not harder.</span></h1>
+    <p>Tell us your subjects and topics. Our AI engine builds a personalized daily study plan — so you always know exactly what to focus on.</p>
+    <div class="hero-cta">
+        <a href="/login"    class="btn btn-primary">Sign in</a>
+        <a href="/register" class="btn btn-secondary">Create account</a>
+        <a href="#features" class="btn btn-ghost">See how it works ↓</a>
+    </div>
+</section>
+
+<section id="features">
+    <h2>Everything you need to stay on track</h2>
+    <p style="color:var(--text-2);max-width:500px;margin:0 auto;text-align:center;font-size:1.05rem;">
+        From your subjects to a daily plan in seconds. Let the algorithm do the scheduling so you can do the learning.
+    </p>
+
+    <div class="features-grid">
+        <div class="feature-card glass">
+            <div class="feature-icon">📚</div>
+            <h3>Smart scheduling</h3>
+            <p>Our intelligent planner analyzes topic difficulty and your deadline to build the optimal daily schedule.</p>
+        </div>
+        <div class="feature-card glass">
+            <div class="feature-icon">🎯</div>
+            <h3>Deadline-aware</h3>
+            <p>Set your exam date and daily hours. The planner works backwards to ensure complete coverage.</p>
+        </div>
+        <div class="feature-card glass">
+            <div class="feature-icon">🔥</div>
+            <h3>Streak tracking</h3>
+            <p>Stay motivated. Complete today's plan and come back tomorrow to keep your daily chain going.</p>
+        </div>
+        <div class="feature-card glass">
+            <div class="feature-icon">✓</div>
+            <h3>Live Progress</h3>
+            <p>Mark topics done as you go. Your progress dashboard updates live so you always know where you stand.</p>
         </div>
     </div>
+
+    <div class="animation-stage glass">
+        <h3>How it works</h3>
+        <p>A completely automated workflow for academic success.</p>
+        <canvas id="demoCanvas" width="640" height="340"></canvas>
+        <div class="animation-caption" id="animCap">The student types subjects and topics...</div>
+    </div>
+</section>
+
+<script>
+(function () {
+    const cv  = document.getElementById('demoCanvas');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const CAP_EL = document.getElementById('animCap');
+
+    // 4 Phases requested by user
+    const CAPTIONS = [
+        'A student types their subjects and topics...',
+        'AI engine is building the optimal study plan...',
+        'Study plan ready! Time to celebrate! 🎉',
+        'Feeling very happy, the student starts studying!'
+    ];
+    // Durations for each phase in frames
+    const DURS = [140, 100, 120, 160];
+
+    let phase = 0, frame = 0, t = 0;
+
+    const ease = x => x < .5 ? 2*x*x : 1 - Math.pow(-2*x+2,2)/2;
+
+    // Rounded rectangle helper
+    function rr(x,y,w,h,r) {
+        ctx.beginPath();
+        ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+        ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+        ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+        ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+        ctx.closePath();
+    }
+
+    const confetti = Array.from({length:40}, () => ({
+        x: Math.random() * W, y: -25 - Math.random() * 100,
+        vx: (Math.random()-.5)*3, vy: 2 + Math.random()*3,
+        rot: Math.random()*Math.PI, vr: (Math.random()-.5)*.2,
+        w: 6+Math.random()*10, h: 4+Math.random()*6,
+        c: ['#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6'][Math.floor(Math.random()*5)]
+    }));
+
+    function drawDesk() {
+        // Table
+        ctx.fillStyle = '#cbd5e1'; rr(80,220,480,15,6); ctx.fill();
+        // Monitor stand
+        ctx.fillStyle = '#94a3b8'; ctx.fillRect(290,170,30,50); ctx.fillRect(260,215,90,8);
+        // Monitor Bezel
+        ctx.fillStyle = '#1e293b'; rr(190,90,230,140,12); ctx.fill();
+        // Screen
+        ctx.fillStyle = '#f8fafc'; rr(200,100,210,120,6); ctx.fill();
+    }
+
+    function drawStudent(ph, p) {
+        const bx=190, by=170;
+        
+        // Typing animation offset for Phase 0
+        const typ = (ph === 0) ? Math.sin(t*.4)*5 : 0;
+        
+        // Chair
+        ctx.fillStyle='#64748b'; rr(110,240,110,60,10); ctx.fill();
+        ctx.fillStyle='#475569'; rr(105,230,120,20,6); ctx.fill();
+        ctx.strokeStyle='#475569'; ctx.lineWidth=6;
+        ctx.beginPath(); ctx.moveTo(130,300); ctx.lineTo(110,340); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(190,300); ctx.lineTo(210,340); ctx.stroke();
+
+        // Legs
+        ctx.fillStyle='#0f172a'; 
+        rr(bx-20,by+55,20,45,6); ctx.fill(); 
+        rr(bx+10,by+55,20,45,6); ctx.fill();
+        
+        // Shoes
+        ctx.fillStyle='#020617'; 
+        rr(bx-25,by+90,30,12,5); ctx.fill(); 
+        rr(bx+5,by+90,30,12,5); ctx.fill();
+
+        // Torso
+        ctx.fillStyle='#0ea5e9'; rr(bx-30,by,70,60,12); ctx.fill();
+
+        // Head
+        ctx.fillStyle='#fcd34d'; // Skin tone
+        ctx.beginPath(); ctx.arc(bx+5,by-25,28,0,Math.PI*2); ctx.fill();
+        // Hair
+        ctx.fillStyle='#451a03'; 
+        ctx.beginPath(); ctx.arc(bx+5,by-32,28,Math.PI,0); ctx.fill();
+
+        // Face Logic based on Phase
+        const isHappy = (ph === 2 || ph === 3);
+        if (isHappy) {
+            // Happy face
+            ctx.strokeStyle='#0f172a'; ctx.lineWidth=2.5; ctx.lineCap='round';
+            // Eyes (curves)
+            ctx.beginPath(); ctx.arc(bx-5,by-25,6,Math.PI,0); ctx.stroke();
+            ctx.beginPath(); ctx.arc(bx+15,by-25,6,Math.PI,0); ctx.stroke();
+            // Big smile
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.arc(bx+5,by-10,10,0,Math.PI); ctx.fill();
+        } else {
+            // Neutral/Focused face
+            ctx.fillStyle='#0f172a';
+            ctx.beginPath(); ctx.arc(bx-5,by-25,3,0,Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(bx+15,by-25,3,0,Math.PI*2); ctx.fill();
+            // Straight mouth
+            ctx.strokeStyle='#0f172a'; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.moveTo(bx,by-12); ctx.lineTo(bx+10,by-12); ctx.stroke();
+        }
+
+        // Arms Logic based on Phase
+        ctx.strokeStyle='#fcd34d'; ctx.lineWidth=12; ctx.lineCap='round';
+        if (ph === 0 || ph === 1) {
+            // Arms down typing/resting
+            ctx.beginPath(); ctx.moveTo(bx-20,by+15); ctx.lineTo(bx+30,by+70+typ); ctx.stroke(); // Left
+            ctx.beginPath(); ctx.moveTo(bx+35,by+15); ctx.lineTo(bx+65,by+70-typ); ctx.stroke(); // Right
+            
+            // Keyboard on desk
+            ctx.fillStyle='#e2e8f0'; rr(bx+30,by+68,80,15,4); ctx.fill();
+        } else if (ph === 2) {
+            // Arms UP celebrating!
+            ctx.beginPath(); ctx.moveTo(bx-20,by+15); ctx.lineTo(bx-40,by-30); ctx.stroke(); // Left Up
+            ctx.beginPath(); ctx.moveTo(bx+30,by+15); ctx.lineTo(bx+70,by-30); ctx.stroke(); // Right Up
+        } else if (ph === 3) {
+            // Arms holding a book
+            ctx.beginPath(); ctx.moveTo(bx-20,by+15); ctx.lineTo(bx+20,by+40); ctx.stroke(); 
+            ctx.beginPath(); ctx.moveTo(bx+30,by+15); ctx.lineTo(bx+50,by+40); ctx.stroke(); 
+            
+            // The Book being studied
+            ctx.fillStyle='white'; rr(bx+5,by+20,60,40,4); ctx.fill();
+            ctx.strokeStyle='#94a3b8'; ctx.lineWidth=2;
+            ctx.strokeRect(bx+5,by+20,60,40);
+            ctx.beginPath(); ctx.moveTo(bx+35,by+20); ctx.lineTo(bx+35,by+60); ctx.stroke(); // Spine
+            // Book text lines
+            ctx.lineWidth=1.5; ctx.strokeStyle='#cbd5e1';
+            [30, 40, 50].forEach(y => {
+                ctx.beginPath(); ctx.moveTo(bx+10,by+y); ctx.lineTo(bx+30,by+y); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(bx+40,by+y); ctx.lineTo(bx+60,by+y); ctx.stroke();
+            });
+        }
+    }
+
+    function drawScreen(ph, p) {
+        const sx=200, sy=100, sw=210, sh=120;
+        ctx.save(); ctx.beginPath(); rr(sx,sy,sw,sh,6); ctx.clip();
+        ctx.fillStyle='#f8fafc'; ctx.fillRect(sx,sy,sw,sh);
+
+        if (ph === 0) {
+            // Form Setup Screen
+            ctx.fillStyle='#0ea5e9'; ctx.fillRect(sx,sy,sw,25);
+            ctx.fillStyle='white'; ctx.font='bold 11px Inter'; ctx.fillText('Add Subjects',sx+10,sy+16);
+            
+            ctx.fillStyle='#64748b'; ctx.font='9px Inter';
+            ctx.fillText('Subject:', sx+10, sy+45);
+            ctx.fillText('Topics:', sx+10, sy+75);
+            
+            ctx.fillStyle='white'; ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+            rr(sx+60, sy+35, sw-75, 18, 3); ctx.fill(); ctx.stroke();
+            rr(sx+60, sy+65, sw-75, 18, 3); ctx.fill(); ctx.stroke();
+
+            // Typing effect logic
+            const txt1 = "Physics";
+            const txt2 = "Kinematics, Dynamics";
+            
+            ctx.fillStyle = '#0f172a'; ctx.font = 'bold 9px monospace';
+            let chars1 = Math.floor(Math.min(1, p / 0.4) * txt1.length);
+            let chars2 = Math.floor(Math.max(0, Math.min(1, (p - 0.4) / 0.4)) * txt2.length);
+            
+            ctx.fillText(txt1.slice(0, chars1), sx+65, sy+47);
+            ctx.fillText(txt2.slice(0, chars2), sx+65, sy+77);
+
+            // Generate Button
+            if (p > 0.8) {
+                ctx.fillStyle = '#10b981'; rr(sx+60, sy+95, 90, 16, 4); ctx.fill();
+                ctx.fillStyle = 'white'; ctx.font = 'bold 9px Inter'; 
+                ctx.fillText('Generate Plan', sx+70, sy+106);
+            }
+
+        } else if (ph === 1) {
+            // Loading AI Screen
+            const cx = sx+sw/2, cy = sy+sh/2;
+            const ang = p * Math.PI * 8;
+            ctx.strokeStyle = '#e0effe'; ctx.lineWidth = 6;
+            ctx.beginPath(); ctx.arc(cx, cy-10, 25, 0, Math.PI*2); ctx.stroke();
+            
+            ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(cx, cy-10, 25, ang, ang + Math.PI*1.5); ctx.stroke();
+            
+            ctx.fillStyle = '#0f172a'; ctx.font = 'bold 10px Inter'; ctx.textAlign = 'center';
+            ctx.fillText('AI is optimizing schedule...', cx, cy+30);
+            ctx.textAlign = 'left';
+
+        } else if (ph === 2 || ph === 3) {
+            // Success / Plan Ready Screen
+            ctx.fillStyle='#10b981'; ctx.fillRect(sx,sy,sw,25);
+            ctx.fillStyle='white'; ctx.font='bold 11px Inter'; ctx.fillText('Your Daily Plan',sx+10,sy+16);
+            
+            const tasks = ['1. Read Kinematics Ch 1', '2. Solve 10 Physics problems', '3. Review Dynamics formulas'];
+            tasks.forEach((task, i) => {
+                const ty = sy + 40 + (i*25);
+                ctx.fillStyle = 'white'; rr(sx+10, ty, sw-20, 20, 4); ctx.fill();
+                ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; rr(sx+10, ty, sw-20, 20, 4); ctx.stroke();
+                
+                // Checkboxes
+                ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2; rr(sx+15, ty+5, 10, 10, 2); ctx.stroke();
+                ctx.fillStyle = '#0f172a'; ctx.font = '9px Inter'; ctx.fillText(task, sx+35, ty+14);
+            });
+        }
+
+        ctx.restore();
+    }
+
+    function drawConfetti(p) {
+        confetti.forEach((c, i) => {
+            ctx.save();
+            // Stagger drop for realism
+            let drop = Math.max(0, p * 1.5 - (i * 0.01));
+            ctx.translate((c.x + c.vx * t * 0.5) % W, c.y + (c.vy * drop * 300));
+            ctx.rotate(c.rot + c.vr * t * 0.5);
+            ctx.globalAlpha = 1 - Math.pow(p, 3); // fade out at end
+            ctx.fillStyle = c.c;
+            ctx.fillRect(-c.w/2, -c.h/2, c.w, c.h);
+            ctx.restore();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function tick() {
+        const dur = DURS[phase];
+        t = frame;
+        const p = frame / dur;
+        
+        ctx.clearRect(0, 0, W, H);
+        
+        drawDesk();
+        drawScreen(phase, p);
+        drawStudent(phase, p);
+
+        // Confetti only in Phase 2
+        if (phase === 2) {
+            drawConfetti(p);
+        }
+
+        CAP_EL.textContent = CAPTIONS[phase];
+        frame++;
+        
+        if (frame > dur) { 
+            frame = 0; 
+            phase = (phase + 1) % 4; // Loop through the 4 phases
+        }
+        requestAnimationFrame(tick);
+    }
+
+    tick();
+})();
+</script>
+
 {% endblock %}

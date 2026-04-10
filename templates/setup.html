@@ -1,114 +1,105 @@
 {% extends "layout.html" %}
-
-{% block title %}
-    Setup
-{% endblock %}
+{% block title %}Create Plan{% endblock %}
 {% block content %}
-<div class="container mt-5" style="max-width: 800px;">
 
-    <h2 class="text-center mb-4">Study Plan Setup</h2>
+<div class="page page-md">
+    <div class="page-header">
+        <h2>Create your study plan</h2>
+        <p>Set your deadline, daily hours, subjects, and topics. Our engine does the rest.</p>
+    </div>
 
-    <form action="/setup" method="post" id="mainForm">
+    <form action="/setup" method="post" id="setupForm">
 
-        <!-- Target Section -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">1. Your Target</h5>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Exam Deadline</label>
-                        <input type="date" name="exam_date" class="form-control" required>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Daily Hours</label>
-                        <input type="number" name="hours" step="0.5" min="0.5" max="24" class="form-control" required>
-                    </div>
+        <!-- Target -->
+        <div class="glass" style="padding:1.6rem;margin-bottom:1.25rem;">
+            <div class="section-label">1 — Your target</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" for="exam_date">Exam deadline</label>
+                    <input type="date" name="exam_date" id="exam_date" class="form-control" required>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" for="hours">Daily study hours</label>
+                    <input type="number" name="hours" id="hours" step="0.5" min="0.5" max="24" class="form-control" placeholder="e.g. 3" required>
                 </div>
             </div>
         </div>
 
         <!-- Subjects -->
-        <div id="subject-container">
-            <h5 class="mb-3">2. Subjects & Topics</h5>
+        <div class="section-label" style="margin-bottom:1rem;">2 — Subjects &amp; topics</div>
+        <div id="subjectContainer"></div>
+        <button type="button" class="add-subject-btn" onclick="addSubject()">＋ Add subject</button>
 
-            <div class="card mb-3" id="subject-0">
-                <div class="card-body">
-
-                    <div class="row mb-3">
-                        <div class="col-md-8">
-                            <label class="form-label">Subject</label>
-                            <input type="text" name="subjects[0][name]" class="form-control" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Difficulty(1-10)</label>
-                            <input type="number" name="subjects[0][difficulty]" min="1" max="10" class="form-control" required>
-                        </div>
-                    </div>
-
-                    <div id="topics-0">
-                        <div class="input-group mb-2">
-                            <input type="text" name="subjects[0][topics][]" class="form-control" placeholder="Topic" required>
-                            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
-                        </div>
-                    </div>
-
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addTopic(0)">+ Add Topic</button>
-
-                </div>
-            </div>
-        </div>
-
-        <button type="button" class="btn btn-outline-secondary mb-4" onclick="addSubject()">+ Add Subject</button>
-
-        <div class="d-grid">
-            <button type="submit" class="btn btn-primary btn-lg">Generate Plan</button>
-        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="padding:14px;font-size:1rem;">
+            Generate my study plan →
+        </button>
 
     </form>
 </div>
 
 <script>
-    let subjectCount = 1;
+let sc = 0;
 
-    function addTopic(subjectId) {
-        const container = document.getElementById(`topics-${subjectId}`);
-        const div = document.createElement('div');
-        div.className = 'input-group mb-2';
-        div.innerHTML = `
-            <input type="text" name="subjects[${subjectId}][topics][]" class="form-control glass-input" placeholder="Topic name" required>
-            <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()">×</button>
-        `;
-        container.appendChild(div);
-    }
+function addSubject() {
+    const id = sc++;
+    const el = document.createElement('div');
+    el.className = 'glass subject-card';
+    el.id = 'sub-' + id;
+    el.innerHTML = `
+        <button type="button" class="subject-remove" onclick="this.closest('.subject-card').remove()" title="Remove subject">✕</button>
+        <div class="subject-header">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Subject name</label>
+                <input type="text" name="subjects[${id}][name]" class="form-control" placeholder="e.g. Mathematics" required>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Difficulty (1–10)</label>
+                <input type="number" name="subjects[${id}][difficulty]" min="1" max="10" class="form-control" placeholder="e.g. 7" required>
+            </div>
+        </div>
+        <div class="section-label" style="font-size:.68rem;margin-bottom:.5rem;">Topics</div>
+        <div id="topics-${id}">
+            <div class="input-group">
+                <input type="text" name="subjects[${id}][topics][]" class="form-control" placeholder="Topic name" required>
+                <button type="button" class="btn-remove" onclick="removeTopic(this)">×</button>
+            </div>
+        </div>
+        <button type="button" class="add-btn" onclick="addTopic(${id})">＋ Add topic</button>
+    `;
+    document.getElementById('subjectContainer').appendChild(el);
+    el.querySelector('input[type=text]').focus();
+    el.style.animation = 'fadeUp 0.3s ease both';
+}
 
-    function addSubject() {
-        const container = document.getElementById('subject-container');
-        const div = document.createElement('div');
-        div.className = 'subject-card mb-4 p-3 border border-secondary rounded';
-        div.id = `subject-${subjectCount}`;
-        div.innerHTML = `
-            <div class="row mb-3">
-                <div class="col-md-8">
-                    <label class="form-label">Subject Name</label>
-                    <input type="text" name="subjects[${subjectCount}][name]" class="form-control glass-input" required>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Difficulty (1-10)</label>
-                    <input type="number" name="subjects[${subjectCount}][difficulty]" min="1" max="10" class="form-control glass-input" required>
-                </div>
-            </div>
-            <h6>Topics:</h6>
-            <div class="topic-list" id="topics-${subjectCount}">
-                <div class="input-group mb-2">
-                    <input type="text" name="subjects[${subjectCount}][topics][]" class="form-control glass-input" required>
-                </div>
-            </div>
-            <button type="button" class=""btn btn-sm btn-outline-primary" onclick="addTopic(${subjectCount})">+ Add Topic</button>
-            <button type="button" class="btn btn-sm btn-danger float-end" onclick="this.parentElement.remove()">Remove Subject</button>
-        `;
-        container.appendChild(div);
-        subjectCount++;
+function addTopic(sid) {
+    const container = document.getElementById('topics-' + sid);
+    const subEl = document.getElementById('sub-' + sid);
+    const name  = subEl.querySelector('input[name$="[name]"]').name.match(/\[(\d+)\]/)[1];
+    const div   = document.createElement('div');
+    div.className = 'input-group';
+    div.innerHTML = `
+        <input type="text" name="subjects[${name}][topics][]" class="form-control" placeholder="Topic name" required>
+        <button type="button" class="btn-remove" onclick="removeTopic(this)">×</button>
+    `;
+    container.appendChild(div);
+    div.querySelector('input').focus();
+}
+
+function removeTopic(btn) {
+    const group = btn.closest('.input-group');
+    const container = group.parentElement;
+    if (container.querySelectorAll('.input-group').length > 1) group.remove();
+}
+
+document.getElementById('setupForm').addEventListener('submit', function () {
+    const submit = this.querySelector('[type="submit"]');
+    if (submit) {
+        submit.textContent = 'Generating...';
+        submit.disabled = true;
     }
+});
+
+addSubject();
 </script>
+
 {% endblock %}

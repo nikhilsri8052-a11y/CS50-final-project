@@ -1,12 +1,96 @@
 import os
 import subprocess
-from cs50 import SQL
-from flask import Flask, flash, redirect, render_template, request, session
-from flask_session import Session
+from datetime import datetime, date
+
+from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask_session import Session as FlaskSession
+from sqlalchemy import Boolean, Column, Date, Float, ForeignKey, Integer, String, create_engine, event, text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, declarative_base, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
-from flask import url_for
-from datetime import datetime, date
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    username = Column(String, nullable=False, unique=True)
+    hash = Column(String, nullable=False)
+    streak = Column(Integer, default=0, nullable=False)
+    last_login_date = Column(Date, nullable=True)
+
+    subjects = relationship(
+        "Subject",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    target = relationship(
+        "Target",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+class Subject(Base):
+    __tablename__ = "subjects"
+    id = Column(Integer, primary_key=True)
+    uid = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    sname = Column(String, nullable=False)
+    difficulty = Column(Integer, nullable=False)
+    completed = Column(Boolean, default=False, nullable=False)
+
+    user = relationship("User", back_populates="subjects")
+    topics = relationship(
+        "Topic",
+        back_populates="subject",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+class Topic(Base):
+    __tablename__ = "topics"
+    id = Column(Integer, primary_key=True)
+    sid = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    tname = Column(String, nullable=False)
+    completed = Column(Boolean, default=False, nullable=False)
+    planned_date = Column(Date, nullable=True)
+
+    subject = relationship("Subject", back_populates="topics")
+
+class Target(Base):
+    __tablename__ = "target"
+    id = Column(Integer, primary_key=True)
+    uid = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    examdate = Column(Date, nullable=False)
+    hours_commit = Column(Float, nullable=False)
+
+    user = relationship("User", back_populates="target")
+
+DATABASE_URL = "sqlite:///database.db"
+engine = create_engine(DATABASE_URL, future=True)
+
+@event.listens_for(engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.close()
+
+Base.metadata.create_all(engine)
+
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE topics ADD COLUMN planned_date DATE"))
+except Exception:
+    pass
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+FlaskSession(app)
 
 def login_required(f):
     @wraps(f)
@@ -16,152 +100,241 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-app = Flask(__name__)
-
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
-
-db = SQL("sqlite:///database.db")
-db.execute("PRAGMA foreign_keys = ON")
-
-
 @app.after_request
 def after_request(response):
-    """Ensure responses aren't cached"""
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Expires"] = 0
     response.headers["Pragma"] = "no-cache"
     return response
 
+def get_streak(uid):
+    with Session(engine) as db:
+        user = db.get(User, uid)
+        return user.streak if user and user.streak is not None else 0
+
+
+def clear_user_plan(uid, db):
+    db.query(Target).filter_by(uid=uid).delete(synchronize_session=False)
+    db.query(Subject).filter_by(uid=uid).delete(synchronize_session=False)
+
+
+@app.route("/start_fresh")
+@login_required
+def start_fresh():
+    uid = session["user_id"]
+    with Session(engine) as db:
+        clear_user_plan(uid, db)
+        db.commit()
+
+    flash("Your current plan has been cleared. Create a new setup plan.", "info")
+    return redirect("/setup?fresh=1")
+
+
 @app.route("/")
 def intro():
-    if 'user_id' not in session:
-        return render_template("intro_page.html")
-    return redirect("/home")
+    if "user_id" in session:
+        return redirect("/home")
+    return render_template("intro_page.html")
 
-@app.route("/register", methods=["GET","POST"])
+@app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        confirm = request.form.get("confirm")
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm  = request.form.get("confirm", "")
+
         if not username or not password or not confirm:
-            flash("Invalid Username or password", "danger")
+            flash("All fields are required.", "danger")
             return redirect("/register")
         if password != confirm:
-            flash("Password and Confirm password don't match", "danger")
+            flash("Passwords do not match.", "danger")
             return redirect("/register")
-        hash = generate_password_hash(password)
-        try:
-            db.execute("INSERT INTO users (username, hash) VALUES(?,?)", username, hash)
-            flash("Registration successful!", "success")
-            return redirect("/login")
-        except:
-            flash("Username already taken", "danger")
-            return redirect("/register")
+
+        hash_ = generate_password_hash(password)
+        with Session(engine) as db:
+            user = User(username=username, hash=hash_)
+            db.add(user)
+            try:
+                db.commit()
+                flash("Account created! Please sign in.", "success")
+                return redirect("/login")
+            except IntegrityError:
+                db.rollback()
+                flash("Username already taken.", "danger")
+                return redirect("/register")
+
     return render_template("register.html")
 
-@app.route("/login", methods=["GET","POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         session.clear()
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
         if not username or not password:
-            flash("Invalid username or password", "danger")
+            flash("Please enter your username and password.", "danger")
             return redirect("/login")
-        try:
-            row = db.execute("SELECT id, username, hash FROM users WHERE username=(?)", username)
-        except:
-            flash("Invalid username or password", "danger")
-            return redirect("/login")
-        if len(row) != 1 or not check_password_hash(row[0]["hash"], password):
-            flash("Invalid username or password", "danger")
-            return redirect("/login")
-        session["user_id"] = row[0]["id"]
 
-        # Streak logic
-        current_data = db.execute("SELECT streak, last_login_date FROM users WHERE id = ?", row[0]["id"])
-        streak = current_data[0]["streak"]
-        last_login_str = current_data[0]["last_login_date"]
-        today = date.today()
+        with Session(engine) as db:
+            user = db.query(User).filter_by(username=username).first()
+            if not user or not check_password_hash(user.hash, password):
+                flash("Invalid username or password.", "danger")
+                return redirect("/login")
 
-        if last_login_str:
-            last_login_date = datetime.strptime(last_login_str, "%Y-%m-%d").date()
-            delta = (today - last_login_date).days
-            if delta == 1:
-                streak += 1
-            elif delta > 1:
+            session["user_id"] = user.id
+            uid = user.id
+
+            streak = user.streak if user.streak is not None else 0
+            last_login = user.last_login_date
+            today = date.today()
+
+            if last_login:
+                delta = (today - last_login).days
+                if delta == 1:
+                    streak += 1
+                elif delta > 1:
+                    streak = 1
+            else:
                 streak = 1
-        else:
-            streak = 1
 
-        db.execute("UPDATE users SET streak = ?, last_login_date = ? WHERE id = ?", streak, str(today), row[0]["id"])
+            user.streak = streak
+            user.last_login_date = today
+            db.commit()
+
         return redirect("/home")
+
     return render_template("login.html")
 
 @app.route("/logout")
 @login_required
 def logout():
     session.clear()
-    flash("Logged out successfully", "success")
+    flash("You've been signed out.", "success")
     return redirect("/")
 
 @app.route("/home")
 @login_required
 def home():
-    uid = session['user_id']
+    uid = session["user_id"]
+    streak = get_streak(uid)
 
-    rows = db.execute("SELECT streak FROM users WHERE id = ?", uid)
-    streak = rows[0]["streak"] if rows else 0
+    with Session(engine) as db:
+        target = db.query(Target).filter_by(uid=uid).first()
+        today = date.today()
+        if not target:
+            return redirect("/setup")
 
-    target = db.execute("SELECT * FROM target WHERE uid = ?", uid)
-    if not target:
-        return redirect("/setup")
+        exam_date = target.examdate
+        if exam_date < today:
+            clear_user_plan(uid, db)
+            db.commit()
+            flash("Your exam date has passed. Starting a new plan.", "info")
+            return redirect("/setup?fresh=1")
 
-    exam_date_str = target[0]["examdate"]
-    exam_date = datetime.strptime(exam_date_str, "%Y-%m-%d").date()
+        hours = target.hours_commit
+        exam_date_str = exam_date.isoformat()
+        days_left = max(1, (exam_date - today).days)
 
-    todo_data = db.execute("""
-        SELECT topics.id, topics.tname, subjects.difficulty
-        FROM topics
-        JOIN subjects ON topics.sid = subjects.id
-        WHERE subjects.uid = ? AND topics.completed = 0
-    """, uid)
-
-    if not todo_data:
-        return render_template("home.html", tasks=[], plan=[], streak=streak,
-                               target_date=exam_date_str, all_done=True)
-
-    days_left = (exam_date - date.today()).days
-    if days_left <= 0:
-        days_left = 1
-
-    input_str = "|".join([f"{t['tname']},{t['difficulty']}" for t in todo_data])
-
-    # 6. Call C planner — binary is in engine/ subfolder
-    plan_names = []
-    try:
-        result = subprocess.run(
-            ['./engine/planner', str(days_left), str(target[0]["hours_commit"]), input_str],
-            capture_output=True, text=True, timeout=5
+        total_topics = (
+            db.query(Topic)
+            .join(Subject)
+            .filter(Subject.uid == uid)
+            .count()
         )
-        if result.returncode == 0 and result.stdout.strip():
-            plan_names = [name.strip() for name in result.stdout.strip().split(',')]
-    except Exception as e:
-        flash(f"Planner engine error: {e}", "warning")
+        
+        done_count = (
+            db.query(Topic)
+            .join(Subject)
+            .filter(Subject.uid == uid, Topic.completed.is_(True))
+            .count()
+        )
+        
+        done_pct = round(done_count / total_topics * 100) if total_topics else 0
 
-    # 7. FIX: Filter todo_data to only today's planned topics (matched by name)
-    plan_set = set(plan_names)
-    todays_tasks = [t for t in todo_data if t['tname'] in plan_set]
+        todays_planned_topics = (
+            db.query(Topic, Subject.difficulty)
+            .join(Subject)
+            .filter(Subject.uid == uid, Topic.planned_date == today)
+            .all()
+        )
 
-    # Fallback: if C returned nothing usable, show first topic
-    if not todays_tasks and todo_data:
-        todays_tasks = [todo_data[0]]
+        if todays_planned_topics:
+            todays_tasks = [
+                {"id": t.id, "tname": t.tname, "difficulty": d}
+                for t, d in todays_planned_topics if not t.completed
+            ]
+            if not todays_tasks:
+                return render_template(
+                    "home.html",
+                    tasks=[], all_done=True,
+                    streak=streak, target_date=exam_date_str,
+                    days_left=days_left, hours=hours,
+                    total_topics=total_topics,
+                    done_count=done_count, done_pct=done_pct,
+                )
+        else:
+            todo_rows = (
+                db.query(Topic, Subject.difficulty)
+                .join(Subject)
+                .filter(Subject.uid == uid, Topic.completed.is_(False))
+                .order_by(Topic.id)
+                .all()
+            )
 
-    return render_template("home.html", tasks=todays_tasks, streak=streak,
-                           target_date=exam_date_str, all_done=False)
+            if not todo_rows:
+                return render_template(
+                    "home.html",
+                    tasks=[], all_done=True,
+                    streak=streak, target_date=exam_date_str,
+                    days_left=days_left, hours=hours,
+                    total_topics=total_topics,
+                    done_count=done_count, done_pct=100,
+                )
+
+            todo_data = [
+                {"id": topic.id, "tname": topic.tname, "difficulty": difficulty}
+                for topic, difficulty in todo_rows
+            ]
+
+            input_str = "|".join([f"{t['id']},{t['difficulty']}" for t in todo_data])
+            plan_ids = []
+            planner_bin = os.path.join(
+                os.path.dirname(__file__),
+                "engine",
+                "planner.exe" if os.name == "nt" else "planner"
+            )
+            if not os.path.exists(planner_bin) and os.name == "nt":
+                planner_bin = os.path.join(os.path.dirname(__file__), "engine", "planner")
+
+            try:
+                result = subprocess.run(
+                    [planner_bin, str(days_left), str(hours), input_str],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    plan_ids = [int(n.strip()) for n in result.stdout.strip().split(",") if n.strip().isdigit()]
+            except Exception as e:
+                flash(f"Planner engine error: {e}", "warning")
+
+            if not plan_ids and todo_data:
+                plan_ids = [todo_data[0]["id"]]
+
+            planned_topics = db.query(Topic).filter(Topic.id.in_(plan_ids)).all()
+            for pt in planned_topics:
+                pt.planned_date = today
+            db.commit()
+
+            todays_tasks = [t for t in todo_data if t["id"] in plan_ids]
+
+        return render_template(
+            "home.html",
+            tasks=todays_tasks, all_done=False,
+            streak=streak, target_date=exam_date_str,
+            days_left=days_left, hours=hours,
+            total_topics=total_topics,
+            done_count=done_count, done_pct=done_pct
+        )
 
 @app.route("/complete", methods=["POST"])
 @login_required
@@ -169,92 +342,179 @@ def complete():
     topic_id = request.form.get("topic_id")
     if not topic_id:
         return redirect("/home")
-    # Security: only mark current user's topics
-    db.execute("""
-        UPDATE topics SET completed = 1
-        WHERE id = ? AND sid IN (
-            SELECT id FROM subjects WHERE uid = ?
+
+    try:
+        topic_id = int(topic_id)
+    except ValueError:
+        return redirect("/home")
+
+    with Session(engine) as db:
+        topic = (
+            db.query(Topic)
+            .join(Subject)
+            .filter(Topic.id == topic_id, Subject.uid == session["user_id"])
+            .first()
         )
-    """, topic_id, session["user_id"])
+        if topic:
+            topic.completed = True
+            db.commit()
+
     return redirect("/home")
 
 @app.route("/setup", methods=["GET", "POST"])
 @login_required
 def setup():
+    uid = session["user_id"]
+
     if request.method == "POST":
-        uid = session['user_id']
-        exam_date = request.form.get('exam_date')
-        daily_hours = request.form.get('hours')
+        exam_date   = request.form.get("exam_date", "").strip()
+        daily_hours = request.form.get("hours", "").strip()
 
         if not exam_date or not daily_hours:
-            flash("Please provide exam date and daily commitment hours", "danger")
+            flash("Please provide your exam date and daily hours.", "danger")
             return redirect("/setup")
 
-        # Validate exam date is in the future
         try:
             exam_dt = datetime.strptime(exam_date, "%Y-%m-%d").date()
             if exam_dt <= date.today():
-                flash("Exam date must be in the future", "danger")
+                flash("Exam date must be in the future.", "danger")
                 return redirect("/setup")
         except ValueError:
-            flash("Invalid exam date format", "danger")
+            flash("Invalid date format.", "danger")
             return redirect("/setup")
 
-        try:
-            db.execute("DELETE FROM target WHERE uid = ?", uid)
-            db.execute("DELETE FROM subjects WHERE uid = ?", uid)
-        except Exception:
-            flash("Error clearing previous plan data", "danger")
-            return redirect("/setup")
+        with Session(engine) as db:
+            db.query(Target).filter_by(uid=uid).delete(synchronize_session=False)
+            db.query(Subject).filter_by(uid=uid).delete(synchronize_session=False)
+            db.commit()
 
-        try:
-            db.execute("INSERT INTO target (uid, examdate, hours_commit) VALUES(?,?,?)", uid, exam_date, daily_hours)
-        except Exception:
-            flash("Error saving target goals", "danger")
-            return redirect("/setup")
-
-        subjects_added = 0
-        i = 0
-        while True:
-            sname = request.form.get(f'subjects[{i}][name]')
-            if sname is None:
-                break
-
-            if not sname.strip():
-                i += 1
-                continue
-
-            difficulty = request.form.get(f"subjects[{i}][difficulty]", 5)
-
+            target = Target(uid=uid, examdate=exam_dt, hours_commit=float(daily_hours))
+            db.add(target)
             try:
-                sid = db.execute("INSERT INTO subjects (uid, sname, difficulty) VALUES (?,?,?)",
-                                 uid, sname.strip(), difficulty)
-                topics = request.form.getlist(f"subjects[{i}][topics][]")
-                topics_added = 0
-                for topic in topics:
-                    if topic and topic.strip():
-                        db.execute("INSERT INTO topics (sid, tname) VALUES (?,?)", sid, topic.strip())
-                        topics_added += 1
-
-                if topics_added > 0:
-                    subjects_added += 1
-
-            except Exception as e:
-                flash(f"Error processing subject: {sname}", "danger")
+                db.commit()
+            except Exception:
+                db.rollback()
+                flash("Error saving target.", "danger")
                 return redirect("/setup")
 
-            i += 1
+            subjects_added = _insert_subjects(uid, request.form, db)
+            if subjects_added == 0:
+                flash("Please add at least one subject with topics.", "warning")
+                return redirect("/setup")
 
-        if subjects_added == 0:
-            flash("Please add at least one subject with topics", "warning")
-            return redirect("/setup")
+            db.commit()
 
-        flash("Study plan saved! Here's today's schedule.", "success")
+        flash("Study plan created! Here's today's schedule.", "success")
         return redirect("/home")
 
-    rows = db.execute("SELECT streak FROM users WHERE id = ?", session['user_id'])
-    streak = rows[0]["streak"] if rows else 0
-    return render_template("setup.html", streak=streak)
+    with Session(engine) as db:
+        existing = db.query(Target).filter_by(uid=uid).first()
+    fresh = request.args.get("fresh")
+    if existing and not fresh:
+        flash("You already have a plan. Use Manage Plan to add more subjects.", "info")
+        return redirect("/manage")
+
+    return render_template("setup.html", streak=get_streak(uid))
+
+@app.route("/manage")
+@login_required
+def manage():
+    uid = session["user_id"]
+
+    with Session(engine) as db:
+        target = db.query(Target).filter_by(uid=uid).first()
+        if not target:
+            return redirect("/setup")
+
+        today = date.today()
+        if target.examdate < today:
+            clear_user_plan(uid, db)
+            db.commit()
+            flash("Your exam date has passed. Starting a new plan.", "info")
+            return redirect("/setup?fresh=1")
+
+        raw_subjects = (
+            db.query(Subject)
+            .filter_by(uid=uid)
+            .order_by(Subject.id)
+            .all()
+        )
+
+        subjects = []
+        for s in raw_subjects:
+            topics = [
+                {"tname": topic.tname, "completed": topic.completed}
+                for topic in s.topics
+            ]
+            total = len(topics)
+            done = sum(1 for t in topics if t["completed"])
+            subjects.append({
+                "sname": s.sname,
+                "difficulty": s.difficulty,
+                "topics": topics,
+                "total": total,
+                "done": done,
+            })
+
+    return render_template(
+        "manage.html",
+        subjects=subjects,
+        streak=get_streak(uid),
+    )
+
+@app.route("/add_subjects", methods=["POST"])
+@login_required
+def add_subjects():
+    uid = session["user_id"]
+
+    with Session(engine) as db:
+        target = db.query(Target).filter_by(uid=uid).first()
+        if not target:
+            flash("No existing plan found. Please set one up first.", "warning")
+            return redirect("/setup")
+
+        added = _insert_subjects(uid, request.form, db)
+        if added == 0:
+            flash("Please add at least one subject with topics.", "warning")
+            return redirect("/manage")
+
+        db.commit()
+
+    flash(f"Added {added} subject(s) to your plan!", "success")
+    return redirect("/home")
+
+def _insert_subjects(uid, form, db):
+    subjects_added = 0
+    i = 0
+    while True:
+        sname = form.get(f"subjects[{i}][name]")
+        if sname is None:
+            break
+        sname = sname.strip()
+        if not sname:
+            i += 1
+            continue
+
+        difficulty = form.get(f"subjects[{i}][difficulty]", 5)
+        try:
+            subject = Subject(uid=uid, sname=sname, difficulty=int(difficulty))
+            topics = form.getlist(f"subjects[{i}][topics][]")
+            topics_added = 0
+            for topic in topics:
+                if topic and topic.strip():
+                    subject.topics.append(Topic(tname=topic.strip()))
+                    topics_added += 1
+
+            if topics_added > 0:
+                db.add(subject)
+                subjects_added += 1
+        except Exception:
+            db.rollback()
+            flash(f"Error saving subject '{sname}'.", "danger")
+
+        i += 1
+
+    return subjects_added
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
