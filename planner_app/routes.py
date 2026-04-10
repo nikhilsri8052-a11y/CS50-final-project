@@ -35,9 +35,41 @@ def get_streak(uid):
         return user.streak if user and user.streak is not None else 0
 
 
+def _ensure_planner_executable(path):
+    if os.name != "nt" and os.path.exists(path) and not os.access(path, os.X_OK):
+        try:
+            os.chmod(path, os.stat(path).st_mode | 0o111)
+        except OSError:
+            pass
+
+
 def clear_user_plan(uid, db):
     db.query(Target).filter_by(uid=uid).delete(synchronize_session=False)
     db.query(Subject).filter_by(uid=uid).delete(synchronize_session=False)
+
+
+def _plan_topics_with_python(todo_rows, days_left, hours):
+    """Fallback planner when native engine is unavailable."""
+    if not todo_rows:
+        return [], {}
+
+    days_left = max(1, int(days_left))
+    hours = max(0.5, float(hours))
+
+    sorted_rows = sorted(todo_rows, key=lambda row: row[1], reverse=True)
+    topics_per_day = max(1, (len(sorted_rows) + days_left - 1) // days_left)
+    todays_rows = sorted_rows[:topics_per_day]
+
+    total_difficulty = sum(max(1, int(difficulty)) for _, difficulty in todays_rows) or 1
+
+    plan_ids = []
+    task_hours = {}
+    for topic, difficulty in todays_rows:
+        plan_ids.append(topic.id)
+        topic_hours = (max(1, int(difficulty)) / total_difficulty) * hours
+        task_hours[topic.id] = round(max(0.5, topic_hours), 1)
+
+    return plan_ids, task_hours
 
 
 @app.route("/start_fresh")
@@ -237,6 +269,8 @@ def home():
             if not os.path.exists(planner_bin) and os.name == "nt":
                 planner_bin = os.path.join(ROOT_DIR, "engine", "planner")
 
+            _ensure_planner_executable(planner_bin)
+
             try:
                 result = subprocess.run(
                     [planner_bin, str(days_left), str(hours), input_str],
@@ -256,7 +290,8 @@ def home():
                             except ValueError:
                                 continue
             except Exception as e:
-                flash(f"Planner engine error: {e}", "warning")
+                flash(f"Planner engine error: {e}. Falling back to Python planner.", "warning")
+                plan_ids, task_hours = _plan_topics_with_python(todo_rows, days_left, hours)
 
             if not plan_ids and todo_rows:
                 plan_ids = [todo_rows[0][0].id]
