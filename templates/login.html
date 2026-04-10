@@ -8,7 +8,7 @@
         <p class="sub">Sign in to continue your study plan</p>
 
         <form action="/login" method="post" id="loginForm">
-            <input type="hidden" name="tz_offset" id="tzOffset" value="0">
+            <input type="hidden" name="client_date" id="clientDate">
             <div class="form-group">
                 <label class="form-label" for="username">Username</label>
                 <input type="text" class="form-control" id="username" name="username"
@@ -34,8 +34,11 @@
 </div>
 
 <script>
-// Set timezone offset immediately on page load
-document.getElementById('tzOffset').value = new Date().getTimezoneOffset();
+// Grab today's date straight from the user's browser — no timezone math needed.
+const _d = new Date();
+const _pad = n => String(n).padStart(2, '0');
+document.getElementById('clientDate').value =
+    `${_d.getFullYear()}-${_pad(_d.getMonth()+1)}-${_pad(_d.getDate())}`;
 
 function togglePw(inputId, btn) {
     const inp = document.getElementById(inputId);

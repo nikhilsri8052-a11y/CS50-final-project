@@ -166,13 +166,7 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        # Read timezone offset from the hidden form field first (most reliable),
-        # falling back to whatever was already in the session.
-        form_tz = request.form.get("tz_offset")
-        try:
-            timezone_offset = int(form_tz)
-        except (TypeError, ValueError):
-            timezone_offset = session.get("timezone_offset", session.get("tz_offset_minutes"))
+        timezone_offset = session.get("timezone_offset", session.get("tz_offset_minutes"))
         session.clear()
         if timezone_offset is not None:
             session["timezone_offset"] = timezone_offset
@@ -196,7 +190,14 @@ def login():
 
             streak = user.streak if user.streak is not None else 0
             last_login = user.last_login_date
-            today = get_user_today()
+
+            # Use the date from the user's own browser — eliminates server
+            # timezone issues on hosted platforms like Render.
+            client_date_str = request.form.get("client_date", "").strip()
+            try:
+                today = datetime.strptime(client_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                today = get_user_today()  # fallback
 
             if last_login:
                 delta = (today - last_login).days
