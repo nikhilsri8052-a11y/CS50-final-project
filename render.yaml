@@ -3,7 +3,7 @@ services:
     name: ai-study-planner
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && gcc engine/planner.c -O2 -o engine/planner && chmod +x engine/planner
     startCommand: gunicorn wsgi:app
     envVars:
       - key: SECRET_KEY
