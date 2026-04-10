@@ -28,7 +28,7 @@
             </svg>
             AI Study Planner
         </a>
-        <button class="navbar-toggle" type="button" aria-label="Toggle navigation" onclick="toggleMobileNav()">⋯</button>
+        <button class="navbar-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" onclick="toggleMobileNav()">⋯</button>
         <div class="navbar-links" id="navbarLinks">
             {% if 'user_id' in session %}
             <a href="/home" {% if request.path == '/home' %}class="active"{% endif %}>Dashboard</a>
@@ -41,6 +41,9 @@
             {% if streak is defined and streak %}
             <span class="streak-badge">🔥 {{ streak }}-day streak</span>
             {% endif %}
+            <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle color theme" aria-pressed="false">
+                <span class="theme-icon" aria-hidden="true">🌙</span>
+            </button>
             {% if 'user_id' in session %}
             <a href="/logout" class="btn btn-ghost">Sign out</a>
             {% else %}
@@ -127,16 +130,73 @@
 
 function toggleMobileNav() {
     const nav = document.getElementById('navbarLinks');
+    const toggleBtn = document.querySelector('.navbar-toggle');
     if (!nav) return;
     nav.classList.toggle('open');
+    toggleBtn?.setAttribute('aria-expanded', String(nav.classList.contains('open')));
 }
 
 window.addEventListener('resize', () => {
     if (window.innerWidth > 600) {
         const nav = document.getElementById('navbarLinks');
         nav?.classList.remove('open');
+        document.querySelector('.navbar-toggle')?.setAttribute('aria-expanded', 'false');
     }
 });
+
+document.addEventListener('click', (event) => {
+    if (window.innerWidth > 600) return;
+    const nav = document.getElementById('navbarLinks');
+    const toggleBtn = document.querySelector('.navbar-toggle');
+    if (!nav || !toggleBtn || !nav.classList.contains('open')) return;
+    if (!nav.contains(event.target) && !toggleBtn.contains(event.target)) {
+        nav.classList.remove('open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+});
+
+document.querySelectorAll('#navbarLinks a').forEach((link) => {
+    link.addEventListener('click', () => {
+        if (window.innerWidth <= 600) {
+            document.getElementById('navbarLinks')?.classList.remove('open');
+            document.querySelector('.navbar-toggle')?.setAttribute('aria-expanded', 'false');
+        }
+    });
+});
+
+(function initTheme() {
+    const storageKey = 'themePreference';
+    const root = document.documentElement;
+    const themeBtn = document.getElementById('themeToggle');
+    const themeIcon = themeBtn?.querySelector('.theme-icon');
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const saved = localStorage.getItem(storageKey);
+    const systemTheme = media.matches ? 'dark' : 'light';
+    const initial = saved || systemTheme;
+
+    function applyTheme(theme, persist = true) {
+        root.setAttribute('data-theme', theme);
+        const isDark = theme === 'dark';
+        themeBtn?.setAttribute('aria-pressed', String(isDark));
+        themeBtn?.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+        if (themeIcon) themeIcon.textContent = isDark ? '☀️' : '🌙';
+        if (persist) localStorage.setItem(storageKey, theme);
+    }
+
+    applyTheme(initial, Boolean(saved));
+
+    media.addEventListener('change', (event) => {
+        if (localStorage.getItem(storageKey)) return;
+        applyTheme(event.matches ? 'dark' : 'light', false);
+    });
+
+    themeBtn?.addEventListener('click', () => {
+        const current = root.getAttribute('data-theme') || systemTheme;
+        const next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next, true);
+    });
+})();
 </script>
 
 </body>
