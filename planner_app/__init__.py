@@ -1,0 +1,19 @@
+import os
+from flask import Flask
+from flask_session import Session as FlaskSession
+
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(ROOT_DIR, "templates"),
+    static_folder=os.path.join(ROOT_DIR, "static")
+)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_FILE_DIR"] = os.path.join(ROOT_DIR, "flask_session_data")
+os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
+FlaskSession(app)
+
+from . import routes  # noqa: E402, F401
