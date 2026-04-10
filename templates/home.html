@@ -134,29 +134,46 @@
 </div><!-- /page -->
 
 <script>
+/* Safe toast */
+if (typeof window.showToast !== "function") {
+    window.showToast = function(message) {
+        console.log(message);
+    };
+}
+
 const CIRCUMFERENCE = 289;
 let donePct   = {{ done_pct }};
 let doneCount = {{ done_count }};
 let leftCount = {{ tasks|length }};
 
+/* ✅ FIXED: no form submit, use fetch */
 function completeTask(id, btn) {
+    btn.disabled = true;
     btn.classList.add('done');
     btn.textContent = '✓';
+
     const item = document.getElementById('task-' + id);
 
-    // Animate out after short delay
-    setTimeout(() => {
-        item.classList.add('completing');
-        doneCount++;
-        leftCount = Math.max(0, leftCount - 1);
-        donePct = Math.round(doneCount / (doneCount + leftCount) * 100);
-        updateRing();
+    // Update UI instantly
+    doneCount++;
+    leftCount = Math.max(0, leftCount - 1);
+    donePct = Math.round(doneCount / (doneCount + leftCount) * 100);
+    updateRing();
 
-        // Actually submit form
-        setTimeout(() => {
-            document.getElementById('form-' + id).submit();
-        }, 380);
-    }, 280);
+    item.classList.add('completing');
+
+    // 🔥 Save in background (NO reload race)
+    fetch('/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'topic_id=' + id
+    })
+    .then(() => {
+        console.log("Saved:", id);
+    })
+    .catch(() => {
+        console.error("Failed to save");
+    });
 }
 
 function updateRing() {
@@ -166,28 +183,19 @@ function updateRing() {
     const ml  = document.getElementById('metaLeft');
 
     const offset = (1 - donePct / 100) * CIRCUMFERENCE;
-    fg.style.strokeDashoffset = offset;
-    pct.textContent  = donePct + '%';
-    md.textContent   = doneCount;
-    ml.textContent   = leftCount;
+
+    if (fg) fg.style.strokeDashoffset = offset;
+    if (pct) pct.textContent = donePct + '%';
+    if (md) md.textContent = doneCount;
+    if (ml) ml.textContent = leftCount;
 
     if (donePct >= 100) {
-        fg.style.stroke = '#27ae60';
-        showToast('All done for today! 🎉', 'ok');
-        setTimeout(() => location.reload(), 900);
+        if (fg) fg.style.stroke = '#27ae60';
+        window.showToast("All done for today!");
+
+        setTimeout(() => location.reload(), 800);
     }
 }
-
-// Animate ring in on load
-window.addEventListener('DOMContentLoaded', () => {
-    const fg = document.getElementById('ringFg');
-    if (fg) {
-        fg.style.strokeDashoffset = CIRCUMFERENCE;
-        setTimeout(() => {
-            fg.style.strokeDashoffset = {{ (1 - done_pct / 100) * 289 }};
-        }, 200);
-    }
-});
 </script>
 
 {% endblock %}

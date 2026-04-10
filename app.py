@@ -81,17 +81,24 @@ def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
 
 Base.metadata.create_all(engine)
 
-try:
+def _ensure_topic_columns():
     with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE topics ADD COLUMN planned_date DATE"))
-        conn.execute(text("ALTER TABLE topics ADD COLUMN planned_hours FLOAT"))
-except Exception:
-    pass
+        result = conn.execute(text("PRAGMA table_info(topics)"))
+        existing_columns = {row[1] for row in result}
+
+        if "planned_date" not in existing_columns:
+            conn.execute(text("ALTER TABLE topics ADD COLUMN planned_date DATE"))
+        if "planned_hours" not in existing_columns:
+            conn.execute(text("ALTER TABLE topics ADD COLUMN planned_hours FLOAT"))
+
+_ensure_topic_columns()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_FILE_DIR"] = os.path.join(app.root_path, "flask_session_data")
+os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
 FlaskSession(app)
 
 def login_required(f):
@@ -245,15 +252,6 @@ def home():
             .count()
         )
         
-        done_count = (
-            db.query(Topic)
-            .join(Subject)
-            .filter(Subject.uid == uid, Topic.completed.is_(True))
-            .count()
-        )
-        
-        done_pct = round(done_count / total_topics * 100) if total_topics else 0
-
         subject_topic_counts = dict(
             db.query(Topic.sid, func.count(Topic.id))
             .join(Subject)
@@ -268,6 +266,9 @@ def home():
             .filter(Subject.uid == uid, Topic.planned_date == today)
             .all()
         )
+
+        done_count = 0
+        done_pct = 0
 
         if todays_planned_topics:
             todays_tasks = []
@@ -287,7 +288,7 @@ def home():
                     streak=streak, target_date=exam_date_str,
                     days_left=days_left, hours=hours,
                     total_topics=total_topics,
-                    done_count=done_count, done_pct=done_pct,
+                    done_count=0, done_pct=0,
                 )
         else:
             todo_rows = (
@@ -305,7 +306,7 @@ def home():
                     streak=streak, target_date=exam_date_str,
                     days_left=days_left, hours=hours,
                     total_topics=total_topics,
-                    done_count=done_count, done_pct=100,
+                    done_count=0, done_pct=100,
                 )
 
             input_str = "|".join([f"{t.id},{d}" for t, d in todo_rows])
@@ -359,6 +360,21 @@ def home():
                         "difficulty": d,
                         "hours": task_hours.get(t.id, round(t.planned_hours or 0.5, 1)),
                     })
+
+        todays_total = len(todays_tasks)
+        todays_done = (
+            db.query(Topic)
+            .join(Subject)
+            .filter(
+                Subject.uid == uid,
+                Topic.planned_date == today,
+                Topic.completed.is_(True)
+            )
+            .count()
+        )
+
+        done_count = todays_done
+        done_pct = round(todays_done / todays_total * 100) if todays_total else 0
 
         return render_template(
             "home.html",

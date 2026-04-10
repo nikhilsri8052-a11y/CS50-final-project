@@ -196,6 +196,27 @@ document.querySelectorAll('#navbarLinks a').forEach((link) => {
         applyTheme(next, true);
     });
 })();
+
+function showToast(message, variant = 'ok') {
+    let stack = document.querySelector('.toast-stack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.className = 'toast-stack';
+        document.body.appendChild(stack);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${variant}`;
+    toast.textContent = message;
+    stack.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+        if (!stack.children.length) {
+            stack.remove();
+        }
+    }, 3200);
+}
 </script>
 
 </body>
