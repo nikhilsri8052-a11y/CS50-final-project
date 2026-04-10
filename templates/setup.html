@@ -1,0 +1,114 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Setup
+{% endblock %}
+{% block content %}
+<div class="container mt-5" style="max-width: 800px;">
+
+    <h2 class="text-center mb-4">Study Plan Setup</h2>
+
+    <form action="/setup" method="post" id="mainForm">
+
+        <!-- Target Section -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">1. Your Target</h5>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Exam Deadline</label>
+                        <input type="date" name="exam_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Daily Hours</label>
+                        <input type="number" name="hours" step="0.5" min="0.5" max="24" class="form-control" required>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subjects -->
+        <div id="subject-container">
+            <h5 class="mb-3">2. Subjects & Topics</h5>
+
+            <div class="card mb-3" id="subject-0">
+                <div class="card-body">
+
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Subject</label>
+                            <input type="text" name="subjects[0][name]" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Difficulty(1-10)</label>
+                            <input type="number" name="subjects[0][difficulty]" min="1" max="10" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div id="topics-0">
+                        <div class="input-group mb-2">
+                            <input type="text" name="subjects[0][topics][]" class="form-control" placeholder="Topic" required>
+                            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">×</button>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addTopic(0)">+ Add Topic</button>
+
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-outline-secondary mb-4" onclick="addSubject()">+ Add Subject</button>
+
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary btn-lg">Generate Plan</button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    let subjectCount = 1;
+
+    function addTopic(subjectId) {
+        const container = document.getElementById(`topics-${subjectId}`);
+        const div = document.createElement('div');
+        div.className = 'input-group mb-2';
+        div.innerHTML = `
+            <input type="text" name="subjects[${subjectId}][topics][]" class="form-control glass-input" placeholder="Topic name" required>
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()">×</button>
+        `;
+        container.appendChild(div);
+    }
+
+    function addSubject() {
+        const container = document.getElementById('subject-container');
+        const div = document.createElement('div');
+        div.className = 'subject-card mb-4 p-3 border border-secondary rounded';
+        div.id = `subject-${subjectCount}`;
+        div.innerHTML = `
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <label class="form-label">Subject Name</label>
+                    <input type="text" name="subjects[${subjectCount}][name]" class="form-control glass-input" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Difficulty (1-10)</label>
+                    <input type="number" name="subjects[${subjectCount}][difficulty]" min="1" max="10" class="form-control glass-input" required>
+                </div>
+            </div>
+            <h6>Topics:</h6>
+            <div class="topic-list" id="topics-${subjectCount}">
+                <div class="input-group mb-2">
+                    <input type="text" name="subjects[${subjectCount}][topics][]" class="form-control glass-input" required>
+                </div>
+            </div>
+            <button type="button" class=""btn btn-sm btn-outline-primary" onclick="addTopic(${subjectCount})">+ Add Topic</button>
+            <button type="button" class="btn btn-sm btn-danger float-end" onclick="this.parentElement.remove()">Remove Subject</button>
+        `;
+        container.appendChild(div);
+        subjectCount++;
+    }
+</script>
+{% endblock %}

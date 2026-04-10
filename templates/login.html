@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block topic %}
+    Login
+{% endblock %}
+{% block content %}
+<div class="topic">
+    <form action="/login" method="post">
+        <h1>
+            Login
+        </h1>
+    <div class="mb-3">
+        <label for="username" class="form-label">Username</label>
+        <input type="username" class="form-control" id="username" name="username" placeholder="Username">
+    </div>
+    <div class="mb-3">
+        <label for="exampleInputPassword1" class="form-label">Password</label>
+        <input type="password" class="form-control" id="exampleInputPassword1" name="password" placeholder="Password">
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Submit</button>
+    </form>
+</div>
+{% endblock %}

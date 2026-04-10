@@ -1,0 +1,14 @@
+.topic {
+    display: flex;
+    justify-content: center;   /* center horizontally */
+    margin-top: 40px;
+}
+
+.topic form {
+    width: 300px;              /* keeps form compact */
+}
+
+.topic h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}

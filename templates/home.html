@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            {% if all_done %}
+            <!-- FIX: Show "all done" message instead of redirecting to setup -->
+            <div class="card shadow text-center">
+                <div class="card-body py-5">
+                    <h1 class="display-4">🎉</h1>
+                    <h3 class="card-title mt-3">Today's Tasks Complete!</h3>
+                    <p class="text-muted">You've finished all your topics for today. Come back tomorrow to keep your streak going!</p>
+                    <a href="/setup" class="btn btn-primary mt-3">Start a New Plan</a>
+                </div>
+            </div>
+
+            {% else %}
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Today's Study Plan</h4>
+                    <!-- FIX: target_date now correctly passed from route -->
+                    <span class="badge bg-light text-primary">Target Date: {{ target_date }}</span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">Your AI Engine has prioritized these topics based on difficulty and time left.</p>
+
+                    {% if tasks %}
+                    <ul class="list-group list-group-flush">
+                        <!-- FIX: tasks now contains only today's planned topics from the C engine -->
+                        {% for task in tasks %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <h6 class="mb-0">{{ task.tname }}</h6>
+                                <span class="badge bg-secondary">Difficulty: {{ task.difficulty }}</span>
+                            </div>
+                            <form action="/complete" method="post">
+                                <input type="hidden" name="topic_id" value="{{ task.id }}">
+                                <button type="submit" class="btn btn-outline-success btn-sm">
+                                    ✓ Mark as Done
+                                </button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-center text-muted py-3">No tasks scheduled for today.</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-center">
+                    <a href="/setup" class="btn btn-link btn-sm text-decoration-none">Edit Plan / Add Subjects</a>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}
