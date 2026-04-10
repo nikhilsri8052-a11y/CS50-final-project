@@ -155,11 +155,11 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.25s ease, transform 0.25s ease;
+  transition: color 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
 }
 .bg-item:hover {
-  color: rgba(14, 165, 233, 0.42);
-  transform: scale(1.06);
+  color: rgba(14, 165, 233, 0.34);
+  transform: scale(1.08);
 }
 .bg-item:focus-visible {
   outline: 2px solid rgba(14, 165, 233, 0.55);
