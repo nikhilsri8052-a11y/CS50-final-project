@@ -493,6 +493,55 @@ body::after {
 .feature-card h3 { font-size: 0.93rem; font-weight: 700; margin-bottom: 0.4rem; }
 .feature-card p  { font-size: 0.8rem; color: var(--text-2); line-height: 1.65; }
 
+.stats-card-intro {
+  max-width: 760px;
+  margin: 0 auto 3rem;
+  padding: 1.8rem;
+  text-align: left;
+}
+.stats-card-intro h3 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-bottom: 0.2rem;
+}
+.stats-card-intro > p {
+  color: var(--text-2);
+  font-size: 0.86rem;
+  margin-bottom: 1rem;
+}
+.stats-login-list {
+  list-style: decimal;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.7rem;
+}
+.stats-login-list li {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel-solid) 75%, transparent);
+  border: 1px solid var(--glass-border);
+}
+.stats-user {
+  font-weight: 700;
+  color: var(--text);
+}
+.stats-streak {
+  color: var(--blue-600);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.stats-date {
+  color: var(--text-2);
+  font-size: 0.8rem;
+}
+.stats-empty {
+  color: var(--text-2);
+  font-size: 0.86rem;
+  margin-bottom: 0;
+}
+
 /* ─── Animation stage ─── */
 .animation-stage { max-width: 620px; margin: 0 auto; padding: 2rem; text-align: center; }
 .animation-stage h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.4rem; }

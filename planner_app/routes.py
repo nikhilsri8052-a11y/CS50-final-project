@@ -120,7 +120,16 @@ def start_fresh():
 def intro():
     if "user_id" in session:
         return redirect("/home")
-    return render_template("intro_page.html")
+    with Session(engine) as db:
+        recent_logins = (
+            db.query(User.username, User.streak, User.last_login_date)
+            .filter(User.last_login_date.isnot(None))
+            .order_by(User.last_login_date.desc(), User.id.desc())
+            .limit(10)
+            .all()
+        )
+
+    return render_template("intro_page.html", recent_logins=recent_logins)
 
 
 @app.route("/register", methods=["GET", "POST"])
