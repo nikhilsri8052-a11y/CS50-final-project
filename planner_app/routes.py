@@ -1,6 +1,6 @@
 import os
 import subprocess
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 
 from flask import flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import func, text
@@ -33,6 +33,38 @@ def get_streak(uid):
     with Session(engine) as db:
         user = db.get(User, uid)
         return user.streak if user and user.streak is not None else 0
+
+
+def get_user_today():
+    """Return the user's local date using browser-reported timezone offset when available."""
+    offset_minutes = session.get("tz_offset_minutes")
+
+    if isinstance(offset_minutes, (int, float)):
+        try:
+            minutes = int(offset_minutes)
+            if -840 <= minutes <= 840:
+                return (datetime.now(timezone.utc) - timedelta(minutes=minutes)).date()
+        except (TypeError, ValueError):
+            pass
+
+    return date.today()
+
+
+@app.route("/api/client-timezone", methods=["POST"])
+def set_client_timezone():
+    payload = request.get_json(silent=True) or request.form
+    offset = payload.get("offset") if payload is not None else None
+
+    try:
+        offset = int(offset)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Invalid timezone offset"}), 400
+
+    if offset < -840 or offset > 840:
+        return jsonify({"ok": False, "error": "Timezone offset out of range"}), 400
+
+    session["tz_offset_minutes"] = offset
+    return jsonify({"ok": True})
 
 
 def _ensure_planner_executable(path):
@@ -143,7 +175,7 @@ def login():
 
             streak = user.streak if user.streak is not None else 0
             last_login = user.last_login_date
-            today = date.today()
+            today = get_user_today()
 
             if last_login:
                 delta = (today - last_login).days
@@ -179,7 +211,7 @@ def home():
 
     with Session(engine) as db:
         target = db.query(Target).filter_by(uid=uid).first()
-        today = date.today()
+        today = get_user_today()
         if not target:
             return redirect("/setup")
 
@@ -391,7 +423,7 @@ def setup():
 
         try:
             exam_dt = datetime.strptime(exam_date, "%Y-%m-%d").date()
-            if exam_dt <= date.today():
+            if exam_dt <= get_user_today():
                 flash("Exam date must be in the future.", "danger")
                 return redirect("/setup")
         except ValueError:
@@ -442,7 +474,7 @@ def manage():
         if not target:
             return redirect("/setup")
 
-        today = date.today()
+        today = get_user_today()
         if target.examdate < today:
             clear_user_plan(uid, db)
             db.commit()

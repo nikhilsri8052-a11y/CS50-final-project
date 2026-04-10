@@ -199,6 +199,31 @@ document.querySelectorAll('#navbarLinks a').forEach((link) => {
     });
 })();
 
+
+
+(function syncClientTimezone() {
+    const offset = new Date().getTimezoneOffset();
+    const key = 'lastTimezoneOffset';
+
+    if (localStorage.getItem(key) === String(offset)) {
+        return;
+    }
+
+    fetch('/api/client-timezone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offset })
+    })
+    .then((response) => {
+        if (response.ok) {
+            localStorage.setItem(key, String(offset));
+        }
+    })
+    .catch((error) => {
+        console.debug('Timezone sync skipped:', error);
+    });
+})();
+
 function showToast(message, variant = 'ok') {
     let stack = document.querySelector('.toast-stack');
     if (!stack) {
