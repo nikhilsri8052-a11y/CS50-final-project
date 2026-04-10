@@ -73,13 +73,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.local-date').forEach(el => {
         const isoString = el.getAttribute('data-iso');
         if (isoString && isoString !== 'None') {
-            const utcString = isoString.endsWith('Z') ? isoString : isoString + 'Z';
-            const date = new Date(utcString);
-            el.textContent = date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            });
+            // Parse YYYY-MM-DD as a local date (no UTC conversion) to avoid
+            // timezone-shift issues (e.g. IST users seeing the wrong day).
+            const parts = isoString.split('T')[0].split('-');
+            if (parts.length === 3) {
+                const localDate = new Date(
+                    parseInt(parts[0], 10),
+                    parseInt(parts[1], 10) - 1,
+                    parseInt(parts[2], 10)
+                );
+                el.textContent = localDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+            }
         }
     });
 });
