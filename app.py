@@ -2,7 +2,7 @@ import os
 import subprocess
 from datetime import datetime, date
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_session import Session as FlaskSession
 from sqlalchemy import Boolean, Column, Date, Float, ForeignKey, Integer, String, create_engine, event, text, func
 from sqlalchemy.exc import IntegrityError
@@ -388,13 +388,19 @@ def home():
 @app.route("/complete", methods=["POST"])
 @login_required
 def complete():
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     topic_id = request.form.get("topic_id")
+
     if not topic_id:
+        if is_ajax:
+            return jsonify({"ok": False, "error": "Missing topic_id"}), 400
         return redirect("/home")
 
     try:
         topic_id = int(topic_id)
     except ValueError:
+        if is_ajax:
+            return jsonify({"ok": False, "error": "Invalid topic_id"}), 400
         return redirect("/home")
 
     with Session(engine) as db:
@@ -404,10 +410,16 @@ def complete():
             .filter(Topic.id == topic_id, Subject.uid == session["user_id"])
             .first()
         )
-        if topic:
-            topic.completed = True
-            db.commit()
+        if not topic:
+            if is_ajax:
+                return jsonify({"ok": False, "error": "Topic not found"}), 404
+            return redirect("/home")
 
+        topic.completed = True
+        db.commit()
+
+    if is_ajax:
+        return jsonify({"ok": True, "topic_id": topic_id})
     return redirect("/home")
 
 @app.route("/setup", methods=["GET", "POST"])

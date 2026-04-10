@@ -134,46 +134,56 @@
 </div><!-- /page -->
 
 <script>
-/* Safe toast */
-if (typeof window.showToast !== "function") {
-    window.showToast = function(message) {
+const toast = (message, variant = 'ok') => {
+    if (typeof window.showToast === 'function') {
+        window.showToast(message, variant);
+    } else {
         console.log(message);
-    };
-}
+    }
+};
 
 const CIRCUMFERENCE = 289;
 let donePct   = {{ done_pct }};
 let doneCount = {{ done_count }};
 let leftCount = {{ tasks|length }};
 
-/* ✅ FIXED: no form submit, use fetch */
-function completeTask(id, btn) {
+async function completeTask(id, btn) {
     btn.disabled = true;
     btn.classList.add('done');
     btn.textContent = '✓';
 
     const item = document.getElementById('task-' + id);
+    item?.classList.add('completing');
 
-    // Update UI instantly
+    let saved = false;
+    try {
+        const res = await fetch('/complete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: 'topic_id=' + encodeURIComponent(id)
+        });
+        saved = res.ok;
+    } catch (error) {
+        console.error('Failed to save task completion:', error);
+    }
+
+    if (!saved) {
+        btn.disabled = false;
+        btn.classList.remove('done');
+        item?.classList.remove('completing');
+        toast('Could not mark topic as done. Please try again.', 'warn');
+        return;
+    }
+
     doneCount++;
     leftCount = Math.max(0, leftCount - 1);
-    donePct = Math.round(doneCount / (doneCount + leftCount) * 100);
+    const total = doneCount + leftCount;
+    donePct = total > 0 ? Math.round((doneCount / total) * 100) : 100;
+
     updateRing();
-
-    item.classList.add('completing');
-
-    // 🔥 Save in background (NO reload race)
-    fetch('/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'topic_id=' + id
-    })
-    .then(() => {
-        console.log("Saved:", id);
-    })
-    .catch(() => {
-        console.error("Failed to save");
-    });
 }
 
 function updateRing() {
@@ -189,11 +199,10 @@ function updateRing() {
     if (md) md.textContent = doneCount;
     if (ml) ml.textContent = leftCount;
 
-    if (donePct >= 100) {
+    if (donePct >= 100 && leftCount === 0) {
         if (fg) fg.style.stroke = '#27ae60';
-        window.showToast("All done for today!");
-
-        setTimeout(() => location.reload(), 800);
+        toast('All tasks for today are complete!');
+        setTimeout(() => location.reload(), 900);
     }
 }
 </script>
