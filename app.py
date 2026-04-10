@@ -4,7 +4,7 @@ from datetime import datetime, date
 
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_session import Session as FlaskSession
-from sqlalchemy import Boolean, Column, Date, Float, ForeignKey, Integer, String, create_engine, event, text
+from sqlalchemy import Boolean, Column, Date, Float, ForeignKey, Integer, String, create_engine, event, text, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, declarative_base, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -57,6 +57,7 @@ class Topic(Base):
     tname = Column(String, nullable=False)
     completed = Column(Boolean, default=False, nullable=False)
     planned_date = Column(Date, nullable=True)
+    planned_hours = Column(Float, nullable=True)
 
     subject = relationship("Subject", back_populates="topics")
 
@@ -83,6 +84,7 @@ Base.metadata.create_all(engine)
 try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE topics ADD COLUMN planned_date DATE"))
+        conn.execute(text("ALTER TABLE topics ADD COLUMN planned_hours FLOAT"))
 except Exception:
     pass
 
@@ -252,18 +254,32 @@ def home():
         
         done_pct = round(done_count / total_topics * 100) if total_topics else 0
 
+        subject_topic_counts = dict(
+            db.query(Topic.sid, func.count(Topic.id))
+            .join(Subject)
+            .filter(Subject.uid == uid)
+            .group_by(Topic.sid)
+            .all()
+        )
+
         todays_planned_topics = (
-            db.query(Topic, Subject.difficulty)
+            db.query(Topic)
             .join(Subject)
             .filter(Subject.uid == uid, Topic.planned_date == today)
             .all()
         )
 
         if todays_planned_topics:
-            todays_tasks = [
-                {"id": t.id, "tname": t.tname, "difficulty": d}
-                for t, d in todays_planned_topics if not t.completed
-            ]
+            todays_tasks = []
+            for t in todays_planned_topics:
+                if t.completed:
+                    continue
+                todays_tasks.append({
+                    "id": t.id,
+                    "tname": t.tname,
+                    "difficulty": t.subject.difficulty,
+                    "hours": round(t.planned_hours, 1) if t.planned_hours is not None else 0.5,
+                })
             if not todays_tasks:
                 return render_template(
                     "home.html",
@@ -292,13 +308,9 @@ def home():
                     done_count=done_count, done_pct=100,
                 )
 
-            todo_data = [
-                {"id": topic.id, "tname": topic.tname, "difficulty": difficulty}
-                for topic, difficulty in todo_rows
-            ]
-
-            input_str = "|".join([f"{t['id']},{t['difficulty']}" for t in todo_data])
+            input_str = "|".join([f"{t.id},{d}" for t, d in todo_rows])
             plan_ids = []
+            task_hours = {}
             planner_bin = os.path.join(
                 os.path.dirname(__file__),
                 "engine",
@@ -313,19 +325,40 @@ def home():
                     capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0 and result.stdout.strip():
-                    plan_ids = [int(n.strip()) for n in result.stdout.strip().split(",") if n.strip().isdigit()]
+                    parts = result.stdout.strip().split(",")
+                    for p in parts:
+                        p = p.strip()
+                        if ":" in p:
+                            tid_str, thours_str = p.split(":", 1)
+                            try:
+                                tid = int(tid_str)
+                                thours = float(thours_str)
+                                plan_ids.append(tid)
+                                task_hours[tid] = round(thours, 1)
+                            except ValueError:
+                                continue
             except Exception as e:
                 flash(f"Planner engine error: {e}", "warning")
 
-            if not plan_ids and todo_data:
-                plan_ids = [todo_data[0]["id"]]
+            if not plan_ids and todo_rows:
+                plan_ids = [todo_rows[0][0].id]
+                task_hours[plan_ids[0]] = round(hours, 1)
 
             planned_topics = db.query(Topic).filter(Topic.id.in_(plan_ids)).all()
             for pt in planned_topics:
                 pt.planned_date = today
+                pt.planned_hours = task_hours.get(pt.id, pt.planned_hours or 0.5)
             db.commit()
 
-            todays_tasks = [t for t in todo_data if t["id"] in plan_ids]
+            todays_tasks = []
+            for t, d in todo_rows:
+                if t.id in plan_ids:
+                    todays_tasks.append({
+                        "id": t.id,
+                        "tname": t.tname,
+                        "difficulty": d,
+                        "hours": task_hours.get(t.id, round(t.planned_hours or 0.5, 1)),
+                    })
 
         return render_template(
             "home.html",

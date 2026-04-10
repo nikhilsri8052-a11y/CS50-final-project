@@ -36,9 +36,16 @@
                 <button class="check-btn" onclick="completeTask({{ task.id }}, this)" title="Mark as done">✓</button>
 
                 <div class="task-info">
-                    <div class="task-name">{{ task.tname }}</div>
-                    <div class="diff-bar-wrap">
+                    <div class="task-name">
+                        {{ task.tname }}
+                        <span class="badge" style="background:#e1f5fe;color:#0288d1;font-size:.7rem;margin-left:.7rem;">
+                            ⏱ {{ task.hours }} hrs
+                        </span>
+                    </div>
+                    <div class="task-meta-row" style="margin-top:.5rem;gap:.5rem;flex-wrap:wrap;">
                         <span class="diff-chip" data-tip="Difficulty out of 10">{{ task.difficulty }}/10</span>
+                    </div>
+                    <div class="diff-bar-wrap">
                         <div class="diff-bar">
                             <div class="diff-bar-fill" style="width:{{ (task.difficulty / 10 * 100)|int }}%"></div>
                         </div>

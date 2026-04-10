@@ -21,13 +21,17 @@ int main(int argc, char *argv[])
     char *token = strtok(input_data, "|");
     while (token != NULL && topic_count < 1000)
     {
-        sscanf(token, "%d,%d", &topics[topic_count].id, &topics[topic_count].difficulty);
+        if (sscanf(token, "%d,%d", &topics[topic_count].id, &topics[topic_count].difficulty) != 2)
+        {
+            return 1;
+        }
         topic_count++;
         token = strtok(NULL, "|");
     }
 
     if (topic_count == 0) return 0;
     if (days_left <= 0) days_left = 1;
+    if (hours_per_day <= 0) hours_per_day = 1;
 
     int total_difficulty = 0;
     for (int i = 0; i < topic_count; i++)
@@ -41,7 +45,8 @@ int main(int argc, char *argv[])
     for (int i = 0; i < topic_count; i++)
     {
         if (i > 0) printf(",");
-        printf("%d", topics[i].id);
+        double topic_hours = ((double)topics[i].difficulty / diff_per_day) * hours_per_day;
+        printf("%d:%.2f", topics[i].id, topic_hours);
         current_sum += topics[i].difficulty;
 
         if (current_sum >= diff_per_day)
