@@ -4,3 +4,4 @@ database.db
 flask_session_data/
 *.pyc
 .env
+*.db
