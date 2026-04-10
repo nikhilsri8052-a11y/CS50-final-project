@@ -221,9 +221,9 @@ function updateDaysLeftLive() {
     const localToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const diffMs = targetDate - localToday;
     const msPerDay = 24 * 60 * 60 * 1000;
-    const daysLeft = Math.max(1, Math.ceil(diffMs / msPerDay));
+    const daysLeft = Math.ceil(diffMs / msPerDay);
 
-    daysLeftEl.textContent = daysLeft;
+    daysLeftEl.textContent = daysLeft > 0 ? daysLeft : 0;
 }
 
 function scheduleNextLocalMidnightRefresh() {

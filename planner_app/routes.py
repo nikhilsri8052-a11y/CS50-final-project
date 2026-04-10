@@ -37,9 +37,9 @@ def get_streak(uid):
 
 def get_user_today():
     """Return the user's local date using browser-reported timezone offset when available."""
-    offset_minutes = session.get("tz_offset_minutes")
+    offset_minutes = session.get("timezone_offset", session.get("tz_offset_minutes", 0))
 
-    if isinstance(offset_minutes, (int, float)):
+    if isinstance(offset_minutes, (int, float, str)):
         try:
             minutes = int(offset_minutes)
             if -840 <= minutes <= 840:
@@ -63,8 +63,9 @@ def set_client_timezone():
     if offset < -840 or offset > 840:
         return jsonify({"ok": False, "error": "Timezone offset out of range"}), 400
 
+    session["timezone_offset"] = offset
     session["tz_offset_minutes"] = offset
-    return jsonify({"ok": True})
+    return '', 204
 
 
 def _ensure_planner_executable(path):
@@ -165,7 +166,12 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        timezone_offset = session.get("timezone_offset", session.get("tz_offset_minutes"))
         session.clear()
+        if timezone_offset is not None:
+            session["timezone_offset"] = timezone_offset
+            session["tz_offset_minutes"] = timezone_offset
+
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
