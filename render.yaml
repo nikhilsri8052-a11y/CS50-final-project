@@ -3,8 +3,14 @@ services:
     name: ai-study-planner
     env: python
     plan: free
+    # This compiles your C planner during the build process
     buildCommand: pip install -r requirements.txt && gcc engine/planner.c -O2 -o engine/planner && chmod +x engine/planner
-    startCommand: gunicorn wsgi:app
+    # This tells Gunicorn to use the 'app' object inside 'app.py'
+    startCommand: gunicorn app:app
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-study-planner-db # Make sure this matches your DB name in Render
+          property: connectionString
       - key: SECRET_KEY
-        sync: false
+        generateValue: true
