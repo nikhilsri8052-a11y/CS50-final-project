@@ -49,7 +49,7 @@
         <div class="animation-caption" id="animCap">The student types subjects and topics...</div>
     </div>
 
-    <div id="stats" class="stats-card-intro glass">
+    <div id="stats" class="stats-card-intro glass" style="margin-top:40px;">
         <h3>Website Stats</h3>
         <p>Latest active learners and their current login streaks.</p>
         {% if recent_logins %}
@@ -58,7 +58,7 @@
                     <li>
                         <span class="stats-user">{{ username }}</span>
                         <span class="stats-streak">🔥 {{ streak }} day{{ '' if streak == 1 else 's' }}</span>
-                        <span class="stats-date">Last login: {{ last_login_date.strftime('%b %d, %Y') }}</span>
+                        <span class="stats-date">Last login: <span class="local-date" data-iso="{{ last_login_date.isoformat() }}"></span></span>
                     </li>
                 {% endfor %}
             </ol>
@@ -67,6 +67,23 @@
         {% endif %}
     </div>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.local-date').forEach(el => {
+        const isoString = el.getAttribute('data-iso');
+        if (isoString && isoString !== 'None') {
+            const utcString = isoString.endsWith('Z') ? isoString : isoString + 'Z';
+            const date = new Date(utcString);
+            el.textContent = date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+    });
+});
+</script>
 
 <script>
 (function () {

@@ -47,7 +47,7 @@ def get_user_today():
         except (TypeError, ValueError):
             pass
 
-    return date.today()
+    return datetime.now(timezone.utc).date()
 
 
 @app.route("/api/client-timezone", methods=["POST"])
