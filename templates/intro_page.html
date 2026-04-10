@@ -42,6 +42,24 @@
         </div>
     </div>
 
+    <div class="stats-card-intro glass">
+        <h3>Website Stats</h3>
+        <p>Latest active learners and their current login streaks.</p>
+        {% if recent_logins %}
+            <ol class="stats-login-list">
+                {% for username, streak, last_login_date in recent_logins %}
+                    <li>
+                        <span class="stats-user">{{ username }}</span>
+                        <span class="stats-streak">🔥 {{ streak }} day{{ '' if streak == 1 else 's' }}</span>
+                        <span class="stats-date">Last login: {{ last_login_date.strftime('%b %d, %Y') }}</span>
+                    </li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p class="stats-empty">No login activity yet. Be the first to start a streak!</p>
+        {% endif %}
+    </div>
+
     <div class="animation-stage glass">
         <h3>How it works</h3>
         <p>A completely automated workflow for academic success.</p>
