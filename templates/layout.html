@@ -28,13 +28,14 @@
             </svg>
             AI Study Planner
         </a>
-
-        {% if 'user_id' in session %}
-        <div class="navbar-links">
+        <button class="navbar-toggle" type="button" aria-label="Toggle navigation" onclick="toggleMobileNav()">⋯</button>
+        <div class="navbar-links" id="navbarLinks">
+            {% if 'user_id' in session %}
             <a href="/home" {% if request.path == '/home' %}class="active"{% endif %}>Dashboard</a>
             <a href="/manage" {% if request.path == '/manage' %}class="active"{% endif %}>Manage Plan</a>
+            {% endif %}
+            <a href="#features">Features</a>
         </div>
-        {% endif %}
 
         <div class="navbar-right">
             {% if streak is defined and streak %}
@@ -42,6 +43,8 @@
             {% endif %}
             {% if 'user_id' in session %}
             <a href="/logout" class="btn btn-ghost">Sign out</a>
+            {% else %}
+            <a href="/login" class="btn btn-primary btn-sm">Sign in</a>
             {% endif %}
         </div>
     </div>
@@ -121,6 +124,19 @@
         bg.appendChild(el);
     }
 })();
+
+function toggleMobileNav() {
+    const nav = document.getElementById('navbarLinks');
+    if (!nav) return;
+    nav.classList.toggle('open');
+}
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 600) {
+        const nav = document.getElementById('navbarLinks');
+        nav?.classList.remove('open');
+    }
+});
 </script>
 
 </body>
