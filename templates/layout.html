@@ -33,6 +33,8 @@
             {% if 'user_id' in session %}
             <a href="/home" {% if request.path == '/home' %}class="active"{% endif %}>Dashboard</a>
             <a href="/manage" {% if request.path == '/manage' %}class="active"{% endif %}>Manage Plan</a>
+            {% elif request.path == '/' %}
+            <a href="#features" {% if request.path == '/' %}class="active"{% endif %}>Features</a>
             {% endif %}
         </div>
 
