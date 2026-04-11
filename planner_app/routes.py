@@ -77,10 +77,42 @@ def _ensure_planner_executable(path):
 
 
 def clear_user_plan(uid, db):
-    db.query(Target).filter_by(uid=uid).delete(synchronize_session=False)
+    # Bulk ORM deletes bypass SQLAlchemy cascade, and SQLite's ON DELETE CASCADE
+    # only fires when PRAGMA foreign_keys=ON is active for that connection.
+    # To be safe across all DB backends, delete in explicit dependency order:
+    # Topics → Subjects → Target.
+
+    # 1. Delete all topics belonging to this user's subjects
+    subject_ids = [
+        sid for (sid,) in db.query(Subject.id).filter_by(uid=uid).all()
+    ]
+    if subject_ids:
+        db.query(Topic).filter(Topic.sid.in_(subject_ids)).delete(
+            synchronize_session=False
+        )
+
+    # 2. Delete all subjects
     db.query(Subject).filter_by(uid=uid).delete(synchronize_session=False)
 
+    # 3. Delete target
+    db.query(Target).filter_by(uid=uid).delete(synchronize_session=False)
 
+
+def reset_topic_plans(uid, db):
+    # Query.update() cannot be combined with .join() in SQLAlchemy legacy API.
+    # Fetch IDs first, then update by ID.
+    incomplete_ids = [
+        tid for (tid,) in
+        db.query(Topic.id)
+        .join(Subject)
+        .filter(Subject.uid == uid, Topic.completed.is_(False))
+        .all()
+    ]
+    if incomplete_ids:
+        db.query(Topic).filter(Topic.id.in_(incomplete_ids)).update(
+            {Topic.planned_date: None, Topic.planned_hours: None},
+            synchronize_session=False
+        )
 def _plan_topics_with_python(todo_rows, days_left, hours):
     """Fallback planner when native engine is unavailable."""
     if not todo_rows:
@@ -325,26 +357,30 @@ def home():
 
             _ensure_planner_executable(planner_bin)
 
-            try:
-                result = subprocess.run(
-                    [planner_bin, str(days_left), str(hours), input_str],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    parts = result.stdout.strip().split(",")
-                    for p in parts:
-                        p = p.strip()
-                        if ":" in p:
-                            tid_str, thours_str = p.split(":", 1)
-                            try:
-                                tid = int(tid_str)
-                                thours = float(thours_str)
-                                plan_ids.append(tid)
-                                task_hours[tid] = round(thours, 1)
-                            except ValueError:
-                                continue
-            except Exception as e:
-                flash(f"Planner engine error: {e}. Falling back to Python planner.", "warning")
+            if os.path.exists(planner_bin):
+                try:
+                    result = subprocess.run(
+                        [planner_bin, str(days_left), str(hours), input_str],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if result.returncode == 0 and result.stdout.strip():
+                        parts = result.stdout.strip().split(",")
+                        for p in parts:
+                            p = p.strip()
+                            if ":" in p:
+                                tid_str, thours_str = p.split(":", 1)
+                                try:
+                                    tid = int(tid_str)
+                                    thours = float(thours_str)
+                                    plan_ids.append(tid)
+                                    task_hours[tid] = round(thours, 1)
+                                except ValueError:
+                                    continue
+                except Exception:
+                    pass  # fall through to Python planner below
+
+            # Python fallback — always runs if binary produced nothing
+            if not plan_ids:
                 plan_ids, task_hours = _plan_topics_with_python(todo_rows, days_left, hours)
 
             if not plan_ids and todo_rows:
@@ -537,31 +573,145 @@ def manage():
 @login_required
 def add_subjects():
     uid = session["user_id"]
+    today = get_user_today()
 
+    # ── Step 1: validate target exists ───────────────────────────────────────
     with Session(engine) as db:
         target = db.query(Target).filter_by(uid=uid).first()
         if not target:
             flash("No existing plan found. Please set one up first.", "warning")
             return redirect("/setup")
+        hours      = target.hours_commit
+        exam_date  = target.examdate
+        days_left  = max(1, (exam_date - today).days)
 
-        added = _insert_subjects(uid, request.form, db)
-        if added == 0:
-            flash("Please add at least one subject with topics.", "warning")
-            return redirect("/manage")
+    # ── Step 2: insert new subjects + topics in their own clean session ───────
+    added = 0
+    try:
+        with Session(engine) as db:
+            added = _insert_subjects(uid, request.form, db)
+            db.commit()
+    except Exception as exc:
+        import traceback; traceback.print_exc()
+        flash(f"Error saving subjects: {exc}", "danger")
+        return redirect("/manage")
 
-        db.commit()
+    if added == 0:
+        flash("Please add at least one subject with topics.", "warning")
+        return redirect("/manage")
 
-    flash(f"Added {added} subject(s) to your plan!", "success")
+    # ── Step 3: clear planned_date for all incomplete topics (reset schedule) ─
+    # SQLAlchemy's legacy Query.update() cannot be combined with .join(), so we
+    # fetch the IDs first via the join, then update by ID with no join needed.
+    try:
+        with Session(engine) as db:
+            incomplete_ids = [
+                tid for (tid,) in
+                db.query(Topic.id)
+                .join(Subject)
+                .filter(Subject.uid == uid, Topic.completed.is_(False))
+                .all()
+            ]
+            if incomplete_ids:
+                db.query(Topic).filter(Topic.id.in_(incomplete_ids)).update(
+                    {Topic.planned_date: None, Topic.planned_hours: None},
+                    synchronize_session=False
+                )
+            db.commit()
+    except Exception as exc:
+        import traceback; traceback.print_exc()
+        flash(f"Error resetting schedule: {exc}", "danger")
+        return redirect("/manage")
+
+    # ── Step 4: run planner and assign today's topics ─────────────────────────
+    try:
+        with Session(engine) as db:
+            todo_rows = (
+                db.query(Topic, Subject.difficulty)
+                .join(Subject)
+                .filter(Subject.uid == uid, Topic.completed.is_(False))
+                .order_by(Topic.id)
+                .all()
+            )
+
+            if todo_rows:
+                plan_ids   = []
+                task_hours = {}
+                input_str  = "|".join([f"{t.id},{d}" for t, d in todo_rows])
+
+                planner_bin = os.path.join(
+                    ROOT_DIR, "engine",
+                    "planner.exe" if os.name == "nt" else "planner"
+                )
+                if not os.path.exists(planner_bin) and os.name == "nt":
+                    planner_bin = os.path.join(ROOT_DIR, "engine", "planner")
+                _ensure_planner_executable(planner_bin)
+
+                if os.path.exists(planner_bin):
+                    try:
+                        result = subprocess.run(
+                            [planner_bin, str(days_left), str(hours), input_str],
+                            capture_output=True, text=True, timeout=5
+                        )
+                        if result.returncode == 0 and result.stdout.strip():
+                            for p in result.stdout.strip().split(","):
+                                p = p.strip()
+                                if ":" in p:
+                                    tid_str, thours_str = p.split(":", 1)
+                                    try:
+                                        tid = int(tid_str)
+                                        plan_ids.append(tid)
+                                        task_hours[tid] = round(float(thours_str), 1)
+                                    except ValueError:
+                                        continue
+                    except Exception:
+                        pass  # fall through to Python planner
+
+                if not plan_ids:
+                    plan_ids, task_hours = _plan_topics_with_python(todo_rows, days_left, hours)
+
+                if not plan_ids:
+                    plan_ids   = [todo_rows[0][0].id]
+                    task_hours = {plan_ids[0]: round(hours, 1)}
+
+                planned = db.query(Topic).filter(Topic.id.in_(plan_ids)).all()
+                for pt in planned:
+                    pt.planned_date  = today
+                    pt.planned_hours = task_hours.get(pt.id, 0.5)
+                db.commit()
+    except Exception as exc:
+        import traceback; traceback.print_exc()
+        flash(f"Error building schedule: {exc}", "danger")
+        return redirect("/manage")
+
+    flash(f"Added {added} subject(s) and rebuilt your plan!", "success")
     return redirect("/home")
 
 
 def _insert_subjects(uid, form, db):
+    """Parse subjects[N][name] / subjects[N][topics][] from form data.
+
+    Scans form keys subjects[0]..subjects[N] with gap tolerance so that
+    removing a subject card in the UI (which leaves a hole in the counter)
+    doesn't stop parsing early.
+
+    NOTE: caller is responsible for db.commit(). This function only adds
+    objects to the session — no flush or rollback is performed here so the
+    caller's transaction stays clean.
+    """
     subjects_added = 0
+    MAX_GAP = 5
+    consecutive_missing = 0
     i = 0
-    while True:
+
+    while consecutive_missing < MAX_GAP:
         sname = form.get(f"subjects[{i}][name]")
         if sname is None:
-            break
+            consecutive_missing += 1
+            i += 1
+            continue
+
+        consecutive_missing = 0
         sname = sname.strip()
         if not sname:
             i += 1
@@ -569,20 +719,22 @@ def _insert_subjects(uid, form, db):
 
         difficulty = form.get(f"subjects[{i}][difficulty]", 5)
         try:
-            subject = Subject(uid=uid, sname=sname, difficulty=int(difficulty))
-            topics = form.getlist(f"subjects[{i}][topics][]")
-            topics_added = 0
-            for topic in topics:
-                if topic and topic.strip():
-                    subject.topics.append(Topic(tname=topic.strip()))
-                    topics_added += 1
+            difficulty = int(difficulty)
+        except (TypeError, ValueError):
+            difficulty = 5
+        difficulty = max(1, min(10, difficulty))
 
-            if topics_added > 0:
-                db.add(subject)
-                subjects_added += 1
-        except Exception:
-            db.rollback()
-            flash(f"Error saving subject '{sname}'.", "danger")
+        subject = Subject(uid=uid, sname=sname, difficulty=difficulty)
+        topics_added = 0
+        for raw_topic in form.getlist(f"subjects[{i}][topics][]"):
+            t = (raw_topic or "").strip()
+            if t:
+                subject.topics.append(Topic(tname=t, completed=False))
+                topics_added += 1
+
+        if topics_added > 0:
+            db.add(subject)
+            subjects_added += 1
 
         i += 1
 

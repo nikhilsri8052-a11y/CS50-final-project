@@ -41,12 +41,12 @@
         </a>
     </div>
 
-    <form action="/add_subjects" method="post" id="addForm">
+    <form id="addForm" onsubmit="return false;">
         <div id="addContainer"></div>
         <button type="button" class="add-subject-btn" onclick="addSubject()">＋ Add subject</button>
 
         <div id="submitWrap" style="display:none;">
-            <button type="submit" class="btn btn-primary btn-block" style="padding:13px;" onclick="this.textContent='Saving...';this.disabled=true;">
+            <button type="button" class="btn btn-primary btn-block" style="padding:13px;" id="saveBtn" onclick="submitPlan()">
                 Save to plan →
             </button>
         </div>
@@ -117,6 +117,56 @@ function removeTopic(btn) {
     const group     = btn.closest('.input-group');
     const container = group.parentElement;
     if (container.querySelectorAll('.input-group').length > 1) group.remove();
+}
+
+async function submitPlan() {
+    // Validate all required fields before submitting
+    const inputs = document.querySelectorAll('#addForm input[required]');
+    for (const inp of inputs) {
+        if (!inp.value.trim()) {
+            inp.focus();
+            inp.reportValidity();
+            return;
+        }
+    }
+
+    const btn = document.getElementById('saveBtn');
+    btn.textContent = 'Saving…';
+    btn.disabled = true;
+
+    try {
+        const formData = new FormData(document.getElementById('addForm'));
+
+        const res = await fetch('/add_subjects', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (res.redirected) {
+            // Server sent a redirect (the normal success/flash path) — follow it
+            window.location.href = res.url;
+            return;
+        }
+
+        if (res.ok) {
+            // Shouldn't happen normally, but just navigate home
+            window.location.href = '/home';
+            return;
+        }
+
+        // Server returned an error status
+        throw new Error(`Server responded with ${res.status}`);
+
+    } catch (err) {
+        console.error('Submit error:', err);
+        btn.textContent = 'Save to plan →';
+        btn.disabled = false;
+        if (typeof window.showToast === 'function') {
+            window.showToast('Something went wrong. Please try again.', 'warn');
+        } else {
+            alert('Something went wrong. Please try again.');
+        }
+    }
 }
 </script>
 
