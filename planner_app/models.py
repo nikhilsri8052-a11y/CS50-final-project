@@ -29,6 +29,63 @@ def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
         cursor.close()
 
 # ... (User, Subject, Topic, Target classes remain exactly the same) ...
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    username = Column(String, nullable=False, unique=True)
+    hash = Column(String, nullable=False)
+    streak = Column(Integer, default=0, nullable=False)
+    last_login_date = Column(Date, nullable=True)
+
+    subjects = relationship(
+        "Subject",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    target = relationship(
+        "Target",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+class Subject(Base):
+    __tablename__ = "subjects"
+    id = Column(Integer, primary_key=True)
+    uid = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    sname = Column(String, nullable=False)
+    difficulty = Column(Integer, nullable=False)
+    completed = Column(Boolean, default=False, nullable=False)
+
+    user = relationship("User", back_populates="subjects")
+    topics = relationship(
+        "Topic",
+        back_populates="subject",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+class Topic(Base):
+    __tablename__ = "topics"
+    id = Column(Integer, primary_key=True)
+    sid = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    tname = Column(String, nullable=False)
+    completed = Column(Boolean, default=False, nullable=False)
+    planned_date = Column(Date, nullable=True)
+    planned_hours = Column(Float, nullable=True)
+
+    subject = relationship("Subject", back_populates="topics")
+
+class Target(Base):
+    __tablename__ = "target"
+    id = Column(Integer, primary_key=True)
+    uid = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    examdate = Column(Date, nullable=False)
+    hours_commit = Column(Float, nullable=False)
+
+    user = relationship("User", back_populates="target")
 
 # 3. MIGRATION LOGIC
 Base.metadata.create_all(engine)
