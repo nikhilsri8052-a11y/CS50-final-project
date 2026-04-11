@@ -28,6 +28,12 @@ if DATABASE_URL.startswith("sqlite"):
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE users ADD COLUMN last_login_date DATE"))
 
+        if inspector.has_table("subjects"):
+            column_names = [col["name"] for col in inspector.get_columns("subjects")]
+            if "completed" not in column_names:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE subjects ADD COLUMN completed BOOLEAN NOT NULL DEFAULT 0"))
+
 # 2. CLASSES
 class User(Base):
     __tablename__ = "users"
@@ -44,6 +50,7 @@ class Subject(Base):
     uid = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     sname = Column(String, nullable=False)
     difficulty = Column(Integer, default=5)
+    completed = Column(Boolean, default=False, nullable=False)
     topics = relationship("Topic", back_populates="subject", cascade="all, delete-orphan")
 
 class Topic(Base):
